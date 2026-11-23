@@ -1,0 +1,75 @@
+"""BankLake: enterprise data platform console.   Run:  streamlit run dashboard/app.py
+
+The console never runs Spark itself. Buttons launch `python main.py ...` as a subprocess; every view reads the
+metadata database (SQLite) or the Parquet lake (DuckDB). Nothing shown here is hardcoded: statuses, counts and
+timestamps all come from the execution logs and the lake. Features that are not built say so.
+"""
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+st.set_page_config(page_title="BankLake", page_icon=":material/database:", layout="wide", initial_sidebar_state="expanded")
+
+from bankui import helpers, nav, state, theme  # noqa: E402
+from bankui.components import badge  # noqa: E402
+from bankui.views import etl  # noqa: E402
+from banklake import meta  # noqa: E402
+
+meta.init_db()
+theme.apply()
+st.logo(str(HERE / "assets" / "banklake_logo.svg"), size="large")
+
+P = st.Page
+pages = {
+    "overview": P(etl.home, title="ETL Pipeline", icon=":material/account_tree:", url_path="overview", default=True),
+    "ingestion": P(etl.ingestion, title="1  Ingestion", icon=":material/upload_file:", url_path="ingestion"),
+    "transformation": P(etl.transformation, title="2  Transformation", icon=":material/transform:", url_path="transformation"),
+    "reporting": P(etl.reporting, title="3  Reporting and BI", icon=":material/bar_chart:", url_path="reporting"),
+    "validation": P(etl.validation, title="Validation", icon=":material/fact_check:", url_path="validation"),
+}
+nav.PAGES.update(pages)
+current = st.navigation(list(pages.values()), position="sidebar", expanded=True)
+
+with st.sidebar:
+    st.caption("Masked: Bronze, Silver Merge, Silver Transform. Unmasked: Gold and BI.")
+    st.caption("Synthetic data only. Independent academic project; no client data or code.")
+
+# ------------------------------------------------------------------ header bar
+hs = state.header_state()
+bar, refresh_col, actions_col = st.columns([9, 1.1, 1.2], vertical_alignment="center", gap="small")
+last_ok = (hs["last_success"] or "none yet")
+bar.markdown(
+    f'<div class="bl-top"><div class="t">{current.title}</div><div class="m">'
+    f'<div><span class="k">Environment</span><span class="v">{state.environment()}</span></div>'
+    f'<div><span class="k">Run ID</span><span class="v">{hs["run_id"] or "-"}</span></div>'
+    f'<div><span class="k">Batch</span><span class="v">{hs["batch"] if hs["batch"] is not None else "-"}</span></div>'
+    f'<div><span class="k">Pipeline status</span><span class="v">{badge(hs["status"])}</span></div>'
+    f'<div><span class="k">Last successful run</span><span class="v">{last_ok}</span></div></div></div>', unsafe_allow_html=True)
+if refresh_col.button("Refresh", width="stretch", help="Reload the logs and tables"):
+    st.cache_data.clear()
+    st.rerun()
+with actions_col.popover("Actions", width="stretch"):
+    st.caption("Each action runs the real command (python main.py ...) and refreshes the console.")
+    scale = st.radio("Sample data size", ["small", "full"], horizontal=True, key="act_scale", format_func=lambda x: "Small (~1,000 customers)" if x == "small" else "Full (10,000 customers)")
+    if st.button("Generate sample data (resets the lake)", key="act_gen", width="stretch"):
+        helpers.cli_seq(("reset",), ("generate", "--scale", scale))
+    if st.button("Run all pipelines", key="act_run", width="stretch", type="primary"):
+        helpers.cli_seq(("run",))
+    if st.button("Add incremental batch", key="act_inc", width="stretch"):
+        helpers.cli_seq(("generate", "--incremental"))
+    if st.button("Add incremental batch with deletes", key="act_incd", width="stretch"):
+        helpers.cli_seq(("generate", "--incremental", "--deletes"))
+    if st.button("Run reconciliation", key="act_rec", width="stretch"):
+        helpers.cli_seq(("reconcile",))
+
+if "_last_action" in st.session_state:
+    rc, cmd, out = st.session_state.pop("_last_action")
+    (st.success if rc == 0 else st.error)(f"Finished: {cmd}" if rc == 0 else f"Finished with problems: {cmd}")
+    with st.expander("Command output", expanded=(rc != 0)):
+        st.code(out)
+
+current.run()

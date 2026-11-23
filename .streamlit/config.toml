@@ -1,0 +1,15 @@
+[theme]
+base = "light"
+primaryColor = "#2F5D8A"
+backgroundColor = "#F5F7FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1B2430"
+font = "sans serif"
+chartCategoricalColors = ["#2F5D8A", "#7FA3C4", "#C48A1D", "#2E8B62", "#A23B33", "#6B7280"]
+chartSequentialColors = ["#EEF1F4", "#D5DCE3", "#B6C1CC", "#97A6B5", "#7B8D9F", "#526477", "#43535F", "#34414C", "#262F38", "#181E24"]
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

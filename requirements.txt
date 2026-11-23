@@ -1,0 +1,10 @@
+pyspark==3.5.*
+duckdb>=1.0
+faker
+pandas
+numpy
+pyarrow
+streamlit
+pytest
+cryptography
+sqlglot
