@@ -12,6 +12,7 @@ from .schemas import ENTITIES, SOURCE_SYSTEM
 
 SCALES = {
     "small": dict(customers=1000, accounts=1500, transactions=10000, branches=50, deposits=2000, loans=500),
+    "source": dict(customers=25000, accounts=40000, transactions=300000, branches=800, deposits=40000, loans=12000),
     "full": dict(customers=10000, accounts=15000, transactions=100000, branches=500, deposits=20000, loans=5000),
 }
 REGIONS = ["North", "South", "East", "West", "Central"]

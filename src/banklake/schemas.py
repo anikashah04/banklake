@@ -123,3 +123,112 @@ LAYER_DOCS = {
 # Which Gold table summarises each entity
 GOLD_FOR = {"customer": "customer_360", "account": "branch_performance", "transaction": "transaction_summary",
             "branch": "branch_performance", "deposit": "deposit_summary", "loan": "loan_summary"}
+
+
+# The three (fictional) upstream systems. Each one has its own database; every table has a load frequency.
+#   DAILY      -> the records of the selected business date
+#   MONTHLY    -> the previous month's closing snapshot, loaded on the 1st of a month
+#   QUARTERLY  -> the previous quarter's closing snapshot, loaded on the 1st of Jan / Apr / Jul / Oct
+SOURCES = {
+    "SOURCE 1": dict(name="Core Banking", symbol="FINCORE", system="CORE_BANKING", db="core_banking.db",
+                     tables={"branch": "QUARTERLY", "account": "DAILY", "card": "MONTHLY", "standing_instruction": "MONTHLY",
+                             "cheque_register": "DAILY", "general_ledger_entry": "DAILY", "fx_rate": "DAILY"}),
+    "SOURCE 2": dict(name="Customer CRM", symbol="CUSTHUB", system="CUSTOMER_CRM", db="customer_crm.db",
+                     tables={"customer": "DAILY", "customer_kyc": "DAILY", "customer_address": "MONTHLY",
+                             "customer_interaction": "DAILY", "customer_complaint": "DAILY", "customer_consent": "MONTHLY",
+                             "campaign_response": "DAILY"}),
+    "SOURCE 3": dict(name="Lending & Payments", symbol="LOANPAY", system="LENDING_PAYMENTS", db="lending_payments.db",
+                     tables={"transaction": "DAILY", "loan": "MONTHLY", "deposit": "QUARTERLY", "loan_repayment": "DAILY",
+                             "payment_beneficiary": "MONTHLY", "loan_application": "DAILY", "collateral": "QUARTERLY",
+                             "credit_bureau_score": "MONTHLY", "fraud_alert": "DAILY"}),
+}
+
+# Extra columns the source systems hold on the six core tables (Bronze keeps them; Silver uses the core columns).
+SOURCE_EXTRA_COLUMNS = {
+    "customer": ["date_of_birth", "gender", "marital_status", "occupation", "annual_income", "risk_rating", "kyc_status",
+                 "preferred_channel", "customer_since"],
+    "account": ["currency", "account_status", "product_code", "interest_rate", "overdraft_limit", "last_txn_date", "nominee_flag"],
+    "transaction": ["channel", "currency", "merchant_category", "balance_after", "reference_no", "txn_status"],
+    "branch": ["ifsc_code", "city", "state", "opened_date", "branch_type", "employee_count"],
+    "deposit": ["deposit_type", "interest_rate", "tenure_months", "deposit_status", "opened_date", "auto_renew"],
+    "loan": ["loan_type", "tenure_months", "emi_amount", "disbursed_date", "loan_status", "outstanding_amount", "collateral_type"],
+}
+# Tables that exist only in the source systems (they are ingested to Bronze; the Silver/Gold pipelines do not use them yet).
+SOURCE_ONLY = {
+    "card": ["card_id", "account_id", "card_number", "card_type", "network", "card_status", "issued_date", "expiry_date",
+             "daily_limit", "contactless_enabled", "source_system", "updated_at"],
+    "customer_kyc": ["kyc_id", "customer_id", "id_type", "id_number", "verification_status", "verified_on", "risk_score",
+                     "pep_flag", "document_expiry", "source_system", "updated_at"],
+    "customer_address": ["address_id", "customer_id", "address_type", "address_line", "city", "state", "pincode", "is_primary",
+                         "source_system", "updated_at"],
+    "customer_interaction": ["interaction_id", "customer_id", "channel", "topic", "outcome", "interaction_date", "duration_sec",
+                             "agent_id", "source_system", "updated_at"],
+    "loan_repayment": ["repayment_id", "loan_id", "due_date", "paid_date", "amount_due", "amount_paid", "repayment_status",
+                       "payment_mode", "penalty_amount", "source_system", "updated_at"],
+    "payment_beneficiary": ["beneficiary_id", "customer_id", "beneficiary_name", "beneficiary_account", "bank_ifsc",
+                            "beneficiary_status", "added_on", "daily_limit", "source_system", "updated_at"],
+    "standing_instruction": ["si_id", "account_id", "beneficiary_account", "amount", "frequency", "start_date", "end_date",
+                             "si_status", "next_run_date", "source_system", "updated_at"],
+    "cheque_register": ["cheque_id", "account_id", "cheque_number", "amount", "payee_name", "issue_date", "clearing_date",
+                        "cheque_status", "bank_micr", "source_system", "updated_at"],
+    "general_ledger_entry": ["gl_entry_id", "gl_account", "branch_id", "entry_type", "amount", "currency", "posting_date",
+                             "narration_code", "batch_ref", "source_system", "updated_at"],
+    "fx_rate": ["rate_id", "currency_pair", "buy_rate", "sell_rate", "mid_rate", "rate_source", "rate_date", "source_system", "updated_at"],
+    "customer_complaint": ["complaint_id", "customer_id", "category", "severity", "complaint_status", "channel", "opened_date",
+                           "resolved_date", "resolution_days", "assigned_to", "source_system", "updated_at"],
+    "customer_consent": ["consent_id", "customer_id", "consent_type", "consent_status", "granted_on", "expires_on", "channel",
+                         "source_system", "updated_at"],
+    "campaign_response": ["response_id", "customer_id", "campaign_code", "offer_type", "response", "response_date", "channel",
+                          "conversion_flag", "source_system", "updated_at"],
+    "loan_application": ["application_id", "customer_id", "loan_type", "requested_amount", "tenure_months", "application_status",
+                         "applied_date", "decision_date", "pan_number", "credit_score", "source_system", "updated_at"],
+    "collateral": ["collateral_id", "loan_id", "collateral_type", "market_value", "valuation_date", "ltv_ratio", "collateral_status",
+                   "insurance_flag", "source_system", "updated_at"],
+    "credit_bureau_score": ["score_id", "customer_id", "bureau", "score", "score_band", "pulled_on", "enquiries_6m", "active_loans",
+                            "source_system", "updated_at"],
+    "fraud_alert": ["alert_id", "transaction_id", "account_id", "rule_code", "risk_score", "alert_status", "raised_on", "analyst_id",
+                    "outcome", "source_system", "updated_at"],
+}
+
+
+def source_columns(entity: str) -> list[str]:
+    """Every column of a source table as ingested into Bronze (business_date is only used to select records)."""
+    if entity in SOURCE_ONLY:
+        return list(SOURCE_ONLY[entity])
+    return ENTITIES[entity]["columns"] + SOURCE_EXTRA_COLUMNS.get(entity, [])
+
+
+# Columns that hold a status/type flag: trimmed and upper-cased at Bronze (PII columns are in masking_metadata).
+FLAG_COLUMNS = {
+    "account": ["account_type", "account_status", "currency", "product_code"],
+    "customer": ["segment", "gender", "marital_status", "risk_rating", "kyc_status", "preferred_channel"],
+    "transaction": ["txn_type", "channel", "currency", "txn_status"],
+    "branch": ["region", "state", "branch_type"],
+    "deposit": ["deposit_type", "deposit_status"],
+    "loan": ["loan_type", "loan_status", "collateral_type"],
+    "card": ["card_type", "network", "card_status"],
+    "customer_kyc": ["id_type", "verification_status", "pep_flag"],
+    "customer_address": ["address_type", "state"],
+    "customer_interaction": ["channel", "outcome"],
+    "loan_repayment": ["repayment_status", "payment_mode"],
+    "payment_beneficiary": ["beneficiary_status"],
+    "standing_instruction": ["frequency", "si_status"],
+    "cheque_register": ["cheque_status"],
+    "general_ledger_entry": ["entry_type", "currency"],
+    "fx_rate": ["currency_pair", "rate_source"],
+    "customer_complaint": ["category", "severity", "complaint_status", "channel"],
+    "customer_consent": ["consent_type", "consent_status", "channel"],
+    "campaign_response": ["response", "channel"],
+    "loan_application": ["loan_type", "application_status"],
+    "collateral": ["collateral_type", "collateral_status", "insurance_flag"],
+    "credit_bureau_score": ["bureau", "score_band"],
+    "fraud_alert": ["alert_status", "outcome"],
+}
+# PII on the source-only tables (the core-table PII rules are in meta.MASKING).
+SOURCE_MASKING = [("card", "card_number", "ACCOUNT"), ("customer_kyc", "id_number", "ACCOUNT"),
+                  ("customer_address", "address_line", "FULL"), ("payment_beneficiary", "beneficiary_name", "NAME"),
+                  ("payment_beneficiary", "beneficiary_account", "ACCOUNT"),
+                  ("standing_instruction", "beneficiary_account", "ACCOUNT"), ("cheque_register", "payee_name", "NAME"),
+                  ("loan_application", "pan_number", "ACCOUNT")]
+CALENDAR = ("2024-10-01", "2026-12-31")   # every business date in this range has source records
+FIRST_BUSINESS_DATE = "2025-01-01"          # earliest date offered for ingestion (monthly/quarterly closes exist from here)

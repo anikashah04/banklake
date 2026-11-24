@@ -126,6 +126,27 @@ def protect(df, entity: str, actor: str = "silver_transform", action: str = "MAS
     return df
 
 
+def protect_pandas(df, entity: str, actor: str = "bronze", action: str = "MASK_AT_BRONZE", audit: bool = True):
+    """pandas twin of protect() for the source ingestion engine: same AES-256-GCM vault (store), same token
+    (token_for) and same masking rules (mask_value). Idempotent in the same way: a column that already has its
+    {col}_token is left alone. Returns the DataFrame with masked columns plus {col}_token columns."""
+    from .masking import mask_value
+    rules = {c: r for c, r in masking_rules(entity).items()
+             if c in df.columns and f"{c}_token" not in df.columns}
+    if not rules:
+        return df
+    df = df.copy()
+    for col, rule in rules.items():
+        s = df[col]
+        has = s.notna()
+        store(entity, col, s[has & (s.astype(str).str.strip() != "")].unique())
+        df[f"{col}_token"] = s.map(lambda v: token_for(v) if v is not None and v == v else None)
+        df[col] = s.map(lambda v, r=rule: mask_value(r, v) if v is not None and v == v else None)
+    if audit:
+        meta.log_security(actor, action, entity, ", ".join(f"{c}:{r}" for c, r in rules.items()))
+    return df
+
+
 # ------------------------------------------------------------------ authorization
 def can_unmask(role: str, entity: str, column: str) -> bool:
     rows = meta.query("SELECT 1 FROM role_permissions WHERE role=? AND (entity='*' OR entity=?) AND (column_name='*' OR column_name=?)",
@@ -192,7 +213,8 @@ def leak_scan(entity: str, column: str, sample: int = 500) -> dict:
     import duckdb
     from .common import LAKE, RAW
     from .schemas import ENTITIES
-    spec = ENTITIES[entity]
+    if entity not in ENTITIES:   # source-only tables have no raw files to compare with
+        return {}
     vals = []
     for f in sorted((RAW / entity).glob("*.csv"))[:1]:
         d = pd.read_csv(f, dtype=str)

@@ -51,7 +51,7 @@ def test_validation_page_lists_every_source_table(lake):
 
 
 def test_every_page_survives_an_empty_lake(tmp_path):
-    """A first-time user (nothing generated, nothing run) must see a friendly panel, never a traceback."""
+    """A first-time user (nothing generated, nothing run) must see a friendly panel, never a traceback. Ingestion needs no demo data."""
     import os
     import subprocess
     import sys
@@ -66,7 +66,11 @@ for name, h in pages.items():
     at.run()
     if at.exception:
         bad.append((name, [e.value for e in at.exception]))
-    assert any('No data in the lake yet' in m.value for m in at.markdown), name
+    if name != 'ingestion':   # Ingestion has its own source databases, so it works before anything else exists
+        assert any('No data in the lake yet' in m.value for m in at.markdown), name
+    else:
+        assert any(b.label == 'Start Ingestion' for b in at.button), 'Start Ingestion button missing'
+        assert len([b for b in at.button if b.label == 'Start Ingestion']) == 1
 print('BAD', bad)
 assert not bad
 """
@@ -75,7 +79,7 @@ assert not bad
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
 
-SLOW = ("run", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset", "refresh")
+SLOW = ("start ingestion", "run", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset", "refresh")
 
 
 def test_every_safe_button_on_every_page_does_something(lake):

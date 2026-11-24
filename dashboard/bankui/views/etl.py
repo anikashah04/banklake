@@ -1,11 +1,16 @@
 """The five pages of the console: the ETL pipeline, and one page per part of it. Every number is read from the lake or the logs."""
+import html
+import math
+import time
+from datetime import date
+
 import pandas as pd
 import streamlit as st
 
-from banklake import meta
+from banklake import ingest, meta, sources
 from banklake.lineage import GOLD_LINEAGE, table_lineage
 from banklake.masking import mask_value, masking_rules
-from banklake.schemas import ORDER
+from banklake.schemas import FIRST_BUSINESS_DATE, ORDER, SOURCES
 
 from .. import helpers
 from ..components import badge, fmt_int, strip, table
@@ -133,27 +138,239 @@ def home():
 
 
 # ---------------------------------------------------------------- 2. ingestion
-def ingestion():
-    st.markdown("### 1  Ingestion: source to Bronze")
-    st.caption(f"Source system: {SOURCE_SYSTEM}. Files are read as received, personal details are masked, and the result is stored as Bronze.")
-    if not _has_data():
-        _none()
-        return
-    c = counts()
+ARROW = {"waiting": "#9CA3AF", "processing": "#D97706", "done": "#1F6B4F", "failed": "#B42318", "idle": "#CBD2DC"}
+STAGE_NAME = {"extract": "Extraction", "transform": "Masking", "insert": "Bronze ingestion"}
+STATE_WORD = {"waiting": "Waiting", "processing": "Processing", "done": "Completed", "failed": "Failed"}
+esc = html.escape
+
+
+def _pipeline_svg(snap, arrows, src_rows):
+    """The ingestion pipeline. Arrow colours are the backend's stage states (ingest.arrow_states), not a timer."""
+    tabs = (snap or {}).get("tables", [])
+    ext = sum(t["extracted"] for t in tabs)
+    trn = sum(t["transformed"] for t in tabs)
+    ins = sum(t["inserted"] for t in tabs)
+    o = ['<svg viewBox="0 0 1180 392" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" text-rendering="geometricPrecision">']
+    o.append("<defs>")
+    for k, col in ARROW.items():
+        o.append(f'<marker id="a_{k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+                 f'<path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
+    o.append('<filter id="sh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#172334" flood-opacity=".10"/></filter>')
+    o.append("</defs>")
+
+    def arrow(d, state):
+        col = ARROW[state]
+        extra = ' stroke-dasharray="9 6"><animate attributeName="stroke-dashoffset" from="30" to="0" dur="0.7s" repeatCount="indefinite"/></path>' \
+            if state == "processing" else (' stroke-dasharray="3 5"></path>' if state == "idle" else "></path>")
+        o.append(f'<path d="{d}" fill="none" stroke="{col}" stroke-width="3" marker-end="url(#a_{state})"{extra}')
+
+    def card(x, y, w, h, tag, title, lines, accent):
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="#FFFFFF" stroke="{LINE}" filter="url(#sh)"/>')
+        o.append(f'<path d="M{x},{y + 10} a10,10 0 0 1 10,-10 h2 v{h} h-2 a10,10 0 0 1 -10,-10 z" fill="{accent}"/>')
+        o.append(f'<text x="{x + 24}" y="{y + 26}" font-size="12.5" font-weight="700" letter-spacing=".1em" fill="#374151">{esc(tag)}</text>')
+        o.append(f'<text x="{x + 24}" y="{y + 50}" font-size="16.5" font-weight="800" fill="{INK}">{esc(title)}</text>')
+        for i, ln in enumerate(lines):
+            o.append(f'<text x="{x + 24}" y="{y + 74 + i * 22}" font-size="14.5" font-weight="500" fill="#374151">{esc(ln)}</text>')
+
+    sid_y = {}
+    for i, sid in enumerate(SOURCES):
+        cy = 62 + i * 118
+        cx = 78
+        sid_y[sid] = cy
+        col = ARROW[arrows["S" + sid[-1]]]
+        stroke = f'fill="#FFFFFF" stroke="{col}" stroke-width="3.5" stroke-linejoin="round" filter="url(#sh)"'
+        g = f'fill="none" stroke="{INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"'
+        if i == 0:      # hexagon + bank
+            pts = " ".join(f"{cx + 46 * math.cos(math.radians(60 * k - 30)):.1f},{cy + 46 * math.sin(math.radians(60 * k - 30)):.1f}" for k in range(6))
+            o.append(f'<polygon points="{pts}" {stroke}/>')
+            o.append(f'<g {g}><path d="M{cx - 19},{cy - 4} L{cx},{cy - 19} L{cx + 19},{cy - 4} Z"/><path d="M{cx - 12},{cy} v14 M{cx},{cy} v14 M{cx + 12},{cy} v14 M{cx - 19},{cy + 18} h38"/></g>')
+        elif i == 1:    # circle + person
+            o.append(f'<circle cx="{cx}" cy="{cy}" r="44" {stroke}/>')
+            o.append(f'<g {g}><circle cx="{cx}" cy="{cy - 10}" r="9"/><path d="M{cx - 18},{cy + 22} a18,15 0 0 1 36,0"/></g>')
+        else:           # diamond + coin
+            o.append(f'<rect x="{cx - 34}" y="{cy - 34}" width="68" height="68" rx="8" transform="rotate(45 {cx} {cy})" {stroke}/>')
+            o.append(f'<g {g}><circle cx="{cx}" cy="{cy}" r="16"/><circle cx="{cx}" cy="{cy}" r="9"/><path d="M{cx},{cy - 4} v8"/></g>')
+        o.append(f'<text x="144" y="{cy + 7}" font-size="21" font-weight="800" letter-spacing=".08em" fill="{INK}">{esc(sid)}</text>')
+    for sid in SOURCES:
+        arrow(f"M284,{sid_y[sid]} C340,{sid_y[sid]} 345,186 398,186", arrows["S" + sid[-1]])
+    card(400, 108, 232, 156, "STAGE 1", "Extraction", ["Reads every table due", f"{ext:,} records extracted"], "#172334")
+    arrow("M632,186 L688,186", arrows["transform"])
+    card(690, 108, 262, 156, "STAGE 2", "Masking", ["TRIM + UPPER on flag columns", "AES-256 masking of PII", f"{trn:,} records masked"], "#172334")
+    arrow("M952,186 L1002,186", arrows["insert"])
+    card(1004, 108, 172, 156, "STAGE 3", "Bronze Ingestion", ["Complete", f"{ins:,} inserted"], "#172334")
+    x = 24
+    for k in ("waiting", "processing", "done", "failed"):
+        o.append(f'<line x1="{x}" y1="376" x2="{x + 26}" y2="376" stroke="{ARROW[k]}" stroke-width="3"/>')
+        o.append(f'<text x="{x + 34}" y="380" font-size="14" font-weight="500" fill="#374151">{STATE_WORD[k]}</text>')
+        x += 130
+    o.append("</svg>")
+    return "".join(o)
+
+
+@st.cache_resource(show_spinner="Preparing the source databases (first time only)...")
+def _prepare():
+    meta.init_db()
+    sources.ensure_sources()
+    return True
+
+
+def _results(snap):
     rows = []
-    for e in ORDER:
-        rows.append({"table": e, "source records": c["source"].get(e), "Bronze rows": c["bronze"].get(e), "set aside": c["bad"][("bronze", e)]})
-    strip([("Source tables", len(ORDER), ""), ("Source records", fmt_int(sum(r["source records"] or 0 for r in rows)), "all loads"),
-           ("Bronze rows", fmt_int(sum(r["Bronze rows"] or 0 for r in rows)), "masked"), ("Set aside", fmt_int(sum(r["set aside"] for r in rows)), "unreadable lines")])
-    table(pd.DataFrame(rows))
-    st.markdown("**PII masked at Bronze**")
-    rules = [{"table": e, "column": col, "rule": r, "example": f"{EXAMPLE.get(r, '')} → {mask_value(r, EXAMPLE[r])}" if r in EXAMPLE else ""}
-             for e in ORDER for col, r in masking_rules(e).items()]
-    table(pd.DataFrame(rules))
-    st.caption("The real value is encrypted (AES-256-GCM) into a separate vault. Bronze keeps the masked value and a token. The example column is an illustration, not a real record.")
-    e = st.selectbox("Preview a Bronze table", ORDER, key="ing_preview")
-    if helpers.has("bronze", e):
-        table(helpers.sample("bronze", e, 100))
+    for t in snap["tables"]:
+        rows.append({"Source": t["source_id"], "Table": t["entity"], "Load frequency": t["frequency"].title(),
+                     "Source records": t["source_count"], "Bronze records": t["bronze_count"], "Status": t["status"].title()})
+    return pd.DataFrame(rows)
+
+
+def _live_view():
+    snap = ingest.current()
+    arrows = ingest.arrow_states(snap)
+    live = bool(snap) and snap["status"] == "RUNNING" and ingest.running()
+    if snap and snap["status"] == "RUNNING" and not ingest.running():   # process restarted mid-run: do not claim success
+        snap = dict(snap, status="FAILED", error="The ingestion process stopped before it finished.")
+    with st.container(border=True):
+        st.image(_pipeline_svg(snap, arrows, None), width="stretch")
+    if snap is None:
+        return live
+    if live:
+        tabs = snap["tables"]
+        done = sum(t["status"] in ("SUCCESS", "FAILED", "SKIPPED") for t in tabs)
+        strip([("Current source", snap["current_source"] or "-", ""), ("Current table", snap["current_table"] or "-", ""),
+               ("Stage", STAGE_NAME.get(snap["current_stage"], "-"), f"{done} of {len(tabs)} tables finished"),
+               ("Extracted", fmt_int(sum(t["extracted"] for t in tabs)), "records"),
+               ("Masked", fmt_int(sum(t["transformed"] for t in tabs)), "records"),
+               ("Inserted", fmt_int(sum(t["inserted"] for t in tabs)), "records")])
+    else:
+        _finished(snap)
+    for t in snap["tables"]:
+        if t["status"] == "FAILED":
+            st.error(f"{t['source_id']} · {t['entity']} failed at the {t['failed_stage']} stage: {t['message']}")
+    return live
+
+
+def _finished(snap):
+    tabs = snap["tables"]
+    ok = sum(t["status"] == "SUCCESS" for t in tabs)
+    bad = sum(t["status"] == "FAILED" for t in tabs)
+    skip = sum(t["status"] == "SKIPPED" for t in tabs)
+    if snap.get("error"):
+        st.error(f"Run {snap['run_id']} did not finish: {snap['error']}")
+    strip([("Business date", pd.Timestamp(snap["business_date"]).strftime("%d %b %Y"), snap["run_id"]),
+           ("Tables loaded", ok, f"{skip} already loaded" if skip else ""), ("Tables failed", bad, ""),
+           ("Source records", fmt_int(sum(t["source_count"] for t in tabs)), ""),
+           ("Bronze records", fmt_int(sum(t["bronze_count"] or 0 for t in tabs)), "")])
+    if not tabs:
+        st.info("No tables were due on this business date.")
+        return
+    res = _results(snap)
+    ev = st.dataframe(res, hide_index=True, width="stretch", height=min(38 + 35 * len(res), 560), on_select="rerun", selection_mode="single-row", key="ing_results",
+                      column_config={"Source records": st.column_config.NumberColumn(format="localized"),
+                                     "Bronze records": st.column_config.NumberColumn(format="localized")})
+    sel = ev.selection.rows if ev and ev.selection else []
+    if sel:
+        _inspect(snap["tables"][sel[0]])
+
+
+def _inspect(t):
+    with st.container(border=True):
+        st.markdown(f"**{t['entity']}** · {t['source_id']} · {t['frequency'].title()} load · batch {t['batch_id'] or '-'}")
+        if t["status"] == "FAILED" or not t["batch_id"]:
+            st.caption("This table was not loaded, so there are no Bronze records for this run.")
+            return
+        df = ingest.bronze_batch(t["entity"], t["batch_id"], 200)
+        if df.empty:
+            st.caption("This load contained no records.")
+            return
+        rules = ingest._rules(t["entity"])
+        kinds = {c: ("AES-256 masked" if c in masking_rules(t["entity"]) else "Token" if c.endswith("_token") else "Metadata" if c.startswith("_")
+                     else "TRIM + UPPER" if c in rules else "") for c in df.columns}
+        c1, c2 = st.columns([1, 3])
+        with c1:
+            table(pd.DataFrame({"Column": list(kinds), "Bronze treatment": list(kinds.values())}), height=380)
+        with c2:
+            table(df, height=380)
+
+
+def _controls():
+    latest = sources.latest_business_date()
+    c1, c2, c2b, c3 = st.columns([1.1, 1, 0.8, 2.1], vertical_alignment="bottom")
+    bd = c1.date_input("Business date", value=date(2026, 7, 1), min_value=date.fromisoformat(FIRST_BUSINESS_DATE), max_value=date(2027, 12, 31), key="ing_date",
+                       format="DD/MM/YYYY")
+    future = bd > latest
+    go = c2.button("Start Ingestion", type="primary", width="stretch", disabled=ingest.running() or future, key="ing_start")
+    if c2b.button("Dry Run", width="stretch", disabled=future, key="ing_dry"):
+        _dry_run_dialog(bd)
+    snap = ingest.current()
+    if snap:
+        state = "RUNNING" if ingest.running() else snap["status"]
+        c3.markdown(f"{badge(state)}&nbsp; <span style='color:#6B7280;font-size:.85rem'>{esc(snap['run_id'])} · "
+                    f"{pd.Timestamp(snap['business_date']):%d %b %Y}</span>", unsafe_allow_html=True)
+    if future:
+        st.warning(f"Ingestion is available only up to {latest:%d %b %Y} (yesterday). {bd:%d %b %Y} is not available yet; choose an earlier business date.")
+    if go:
+        try:
+            ingest.start(bd, pace=0.25)
+        except ValueError as e:
+            st.error(str(e))
+            return
+        st.rerun()
+
+
+@st.dialog("Dry run: one row, step by step", width="large")
+def _dry_run_dialog(bd):
+    st.caption(f"Business date {bd:%d %b %Y}. A real record is taken from the source and put through each step. Nothing is written.")
+    due = sources.due_loads(bd)
+    if not due:
+        st.info("No tables are due on this business date.")
+        return
+    labels = {f"{l.entity}  ·  {l.frequency.title()}": l.entity for l in due}
+    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+    pick = c1.selectbox("Table", list(labels), key="dry_table")
+    nth = c2.number_input("Row number", min_value=1, value=1, step=1, key="dry_row")
+    if not st.button("Run dry run", type="primary", key="dry_go"):
+        return
+    try:
+        steps = ingest.dry_run_steps(labels[pick], bd, int(nth))
+    except ValueError as e:
+        st.error(str(e))
+        return
+    ctx = {}
+    for i, (title, fn) in enumerate(steps, 1):
+        box = st.status(f"Step {i} of {len(steps)}  ·  {title}", expanded=True, state="running")
+        time.sleep(0.7)
+        try:
+            with box:
+                res = fn(ctx)
+                st.write(res["note"])
+                if res.get("sql"):
+                    st.code(res["sql"], language="sql")
+                if res.get("table") is not None:
+                    st.dataframe(res["table"], hide_index=True, width="stretch", height=min(38 + 35 * len(res["table"]), 420))
+            box.update(state="complete", expanded=True)
+        except Exception as e:  # noqa: BLE001 - show the failing step and stop
+            box.update(state="error", expanded=True)
+            st.error(f"Step {i} failed: {e}")
+            return
+    st.success("Dry run complete. Nothing was written to Bronze or the vault.")
+
+
+def ingestion():
+    st.markdown("<div style='color:#172334;font-weight:800;font-size:2rem;line-height:1.2;margin:0 0 1rem 0;letter-spacing:-.01em'>Ingestion Pipeline</div>", unsafe_allow_html=True)
+    _prepare()
+    _controls()
+    if ingest.running():
+        _live_fragment()
+    else:
+        if st.session_state.pop("_ing_was_running", False):
+            st.cache_data.clear()
+        _live_view()
+
+
+@st.fragment(run_every=0.5)
+def _live_fragment():
+    st.session_state["_ing_was_running"] = True
+    if not _live_view():
+        st.rerun()
 
 
 # ---------------------------------------------------------------- 3. transformation

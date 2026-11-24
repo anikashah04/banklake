@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime
 
 from .common import DATA, DB_PATH
-from .schemas import ENTITIES, ORDER
+from .schemas import ENTITIES, FLAG_COLUMNS, ORDER, SOURCE_MASKING, SOURCES
 
 DDL = """
 CREATE TABLE IF NOT EXISTS pipeline_metadata(
@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS transformation_audit_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, pipeline_id TEXT, layer TEXT, entity TEXT, batch_id INTEGER,
   load_type TEXT, rows_in INTEGER, inserts INTEGER, updates INTEGER, deletes INTEGER, ignored INTEGER,
   duplicates_removed INTEGER, rejected INTEGER, rows_out INTEGER, ts TEXT);
+CREATE TABLE IF NOT EXISTS source_systems(
+  source_id TEXT PRIMARY KEY, name TEXT, system_code TEXT, db_file TEXT);
+CREATE TABLE IF NOT EXISTS source_tables(
+  source_id TEXT, entity TEXT, load_frequency TEXT, date_column TEXT DEFAULT 'business_date', is_active TEXT DEFAULT 'Y',
+  PRIMARY KEY(source_id, entity));
+CREATE TABLE IF NOT EXISTS bronze_transform_rules(
+  entity TEXT, column_name TEXT, rule TEXT, is_active TEXT DEFAULT 'Y', PRIMARY KEY(entity, column_name));
+CREATE TABLE IF NOT EXISTS ingestion_runs(
+  run_id TEXT PRIMARY KEY, business_date TEXT, status TEXT, start_ts TEXT, end_ts TEXT,
+  tables_total INTEGER, tables_ok INTEGER, tables_failed INTEGER, tables_skipped INTEGER);
+CREATE TABLE IF NOT EXISTS ingestion_batches(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, business_date TEXT, source_id TEXT, entity TEXT,
+  load_frequency TEXT, period_key TEXT, period_end TEXT, batch_id INTEGER, status TEXT,
+  source_count INTEGER, extracted INTEGER, transformed INTEGER, inserted INTEGER, bronze_count INTEGER,
+  failed_stage TEXT, message TEXT, start_ts TEXT, end_ts TEXT);
 CREATE TABLE IF NOT EXISTS pipeline_execution_log(
   execution_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, pipeline_id TEXT,
   source_table TEXT, target_table TEXT, start_ts TEXT, end_ts TEXT, duration_s REAL,
@@ -161,7 +176,14 @@ def init_db() -> None:
         _seed(c, f"gold_{g}", ",".join(deps), g, "silver", "gold", strat, None, f"banklake.gold.run_{g}", None, 40 + n)
         for d in deps:
             c.execute("INSERT OR IGNORE INTO pipeline_dependencies VALUES(?,?)", (f"gold_{g}", f"silver_{d}"))
-    for ent, col, rule in MASKING:
+    for sid, sd in SOURCES.items():
+        c.execute("INSERT OR IGNORE INTO source_systems VALUES(?,?,?,?)", (sid, sd["name"], sd["system"], sd["db"]))
+        for ent, freq in sd["tables"].items():
+            c.execute("INSERT OR IGNORE INTO source_tables(source_id,entity,load_frequency) VALUES(?,?,?)", (sid, ent, freq))
+    for ent, cols in FLAG_COLUMNS.items():
+        for col in cols:
+            c.execute("INSERT OR IGNORE INTO bronze_transform_rules VALUES(?,?,?,?)", (ent, col, "TRIM_UPPER", "Y"))
+    for ent, col, rule in MASKING + SOURCE_MASKING:
         c.execute("INSERT OR IGNORE INTO masking_metadata VALUES(?,?,?,?)", (ent, col, rule, "Y"))
     for role, ent, col in UNMASK:
         c.execute("INSERT OR IGNORE INTO role_permissions VALUES(?,?,?)", (role, ent, col))

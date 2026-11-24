@@ -23,7 +23,7 @@ h1 {{ font-size: 1.35rem !important; font-weight: 650 !important; letter-spacing
 h2, h3 {{ font-size: 1.02rem !important; font-weight: 650 !important; color: {INK}; margin-top: 0.9rem !important; }}
 h4 {{ font-size: 0.92rem !important; font-weight: 650 !important; }}
 p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
-[data-testid="stCaptionContainer"] {{ color: {MUTED}; }}
+[data-testid="stCaptionContainer"] {{ color: #4B5563; font-size: .88rem; }}
 
 /* sidebar */
 [data-testid="stSidebar"] {{ background: {NAVY}; border-right: 1px solid #0A1424; min-width: 15rem; }}
@@ -56,9 +56,9 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 .bl-strip {{ display:flex; border:1px solid {LINE}; border-radius:4px; background:#fff; margin:.2rem 0 .8rem 0; overflow:hidden; }}
 .bl-strip > div {{ flex:1; padding:.5rem .75rem; border-right:1px solid {LINE}; }}
 .bl-strip > div:last-child {{ border-right:none; }}
-.bl-strip .k {{ font-size:.64rem; text-transform:uppercase; letter-spacing:.06em; color:{MUTED}; }}
+.bl-strip .k {{ font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:{MUTED}; }}
 .bl-strip .v {{ font-size:1.2rem; font-weight:650; color:{INK}; line-height:1.25; }}
-.bl-strip .s {{ font-size:.68rem; color:{MUTED}; }}
+.bl-strip .s {{ font-size:.78rem; color:#4B5563; }}
 .bl-node {{ border:1px solid {LINE}; border-top:3px solid #9AA6B6; border-radius:3px; background:#fff; padding:.5rem .6rem; min-height:11.5rem; }}
 .bl-node.SUCCESS, .bl-node.AVAILABLE {{ border-top-color:#2E8B62; }}
 .bl-node.FAILED {{ border-top-color:#B3392F; }}

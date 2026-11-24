@@ -16,7 +16,8 @@ raw CSV/JSON ──► BRONZE (Parquet + ingest metadata) ──► SILVER (type
 | Area | Where | Notes |
 |---|---|---|
 | Synthetic data + injected anomalies | `src/banklake/datagen.py` | duplicates, null names, bad dates, negative amounts, orphan keys, malformed JSON; manifest of what was injected |
-| Bronze ingestion | `bronze.py` | CSV + JSON → Parquet, schema check, full / incremental, corrupt records quarantined |
+| Source ingestion (UI) | `sources.py`, `sourcegen.py`, `ingest.py` | three persistent source DBs (`data/sources/`, 12 banking tables incl. customer_kyc, card, loan_repayment), tables loaded by frequency (daily / monthly close / quarterly close), TRIM+UPPER on flag columns, AES masking via the existing vault, idempotent, table-level failures |
+| Bronze ingestion (files) | `bronze.py` | CSV + JSON → Parquet, schema check, full / incremental, corrupt records quarantined |
 | Silver (PySpark) | `silver.py` | typing, cleaning, dedupe, referential checks, **MERGE/upsert**, rejected rows → quarantine with a reason |
 | Gold (Spark SQL) | `gold.py` | customer 360, branch performance, deposit / loan / transaction summaries |
 | Metadata orchestration | `meta.py`, `orchestrator.py` | pipelines, dependencies, load strategy, active flag all live in a table; retries, `BLOCKED` downstream, watermarks |
@@ -73,7 +74,7 @@ Demo-grade crypto: the key comes from `BANKLAKE_MASK_KEY`; in production it woul
 | Page | What it shows |
 |---|---|
 | ETL Pipeline | Source → 1 Ingestion (Bronze) → 2 Transformation (Silver Merge, Silver Transform, Gold) → 3 Reporting (BI), with live row counts and masked/unmasked layers |
-| 1 Ingestion | source tables, PII masking rules, Bronze preview |
+| 1 Ingestion | three source databases, one **Start Ingestion** button, load-frequency rules, live pipeline diagram, per-table results and Bronze inspector |
 | 2 Transformation | each Silver and Gold step with input/output/set-aside counts; Teradata procedure → Athena SQL + EMR script |
 | 3 Reporting and BI | Gold tables and the executive dashboards |
 | Validation | record counts source vs each layer, and the reconciliation checks |

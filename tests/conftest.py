@@ -5,6 +5,7 @@ from pathlib import Path
 
 # isolated data dir for the whole test session (must be set before importing banklake)
 os.environ["BANKLAKE_HOME"] = tempfile.mkdtemp(prefix="banklake_test_")
+os.environ.setdefault("BANKLAKE_SOURCE_SCALE", "small")   # tests seed the source databases small; the app uses the large "source" scale
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import json  # noqa: E402
