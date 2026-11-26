@@ -1,7 +1,9 @@
-"""Chart library for the Reporting page: 17 chart types built with Altair on one validated categorical palette.
+"""Chart library for the Reporting page: 17 Altair chart types plus Lollipop here and the Plotly set in charts_more.py (pie, treemap, sunburst, radar, gauge, five 3D charts), all on one validated categorical palette.
 Rules kept here: one y-axis (never dual), categories coloured in a fixed order and never cycled (9th+ folds into "Other"),
 thin marks with rounded data ends, a surface-coloured gap between stacked fills, recessive grid, tooltips on every mark."""
 import altair as alt
+
+from . import charts_more
 
 # categorical slots 1-8 (light surface), passed through the palette validator: adjacent CVD and normal-vision checks pass
 PALETTE = ["#257de0", "#f47230", "#00b894", "#f2a600", "#ee7fac", "#008a17", "#6a4ce2", "#ec4647"]
@@ -14,8 +16,13 @@ KINDS = {  # name -> (what it needs from the user)
     "Grouped column": "x, y, split by", "Line": "x, y, optional split", "Area": "x, y", "Stacked area": "x, y, split by",
     "Donut": "slice category, y", "Scatter": "x measure, y measure", "Bubble": "x measure, y measure, size", "Heatmap": "x, y categories, value",
     "Histogram": "one measure", "Box plot": "category, y measure", "Waterfall": "x category, y measure", "Funnel": "x category, y measure",
-    "Range": "x category, low, high",
+    "Range": "x category, low, high", "Lollipop": "x category, y measure",
 }
+KINDS_2D = list(KINDS) + [k for k in charts_more.KINDS_2D if k not in KINDS]
+KINDS_3D = list(charts_more.KINDS_3D)
+KINDS.update(charts_more.NEEDS)
+ALL_KINDS = KINDS_2D + KINDS_3D
+
 
 
 def _fold(df, col, keep=8):
@@ -51,10 +58,12 @@ def _num(c, fmt=",.0f"):
     return alt.Tooltip(c, format=fmt)
 
 
-def build(kind, df, x=None, y=None, color=None, size=None, v=None, how="sum", top=None, log=False, title=None, y2=None, height=H):
-    """Return an Altair chart. y may be a list of measures for Line / Grouped column (they are folded into a split)."""
+def build(kind, df, x=None, y=None, color=None, size=None, v=None, how="sum", top=None, log=False, title=None, y2=None, height=H, z=None):
+    """Return an Altair chart (or a Plotly figure for the kinds in charts_more). y may be a list of measures for Line / Grouped column (they are folded into a split)."""
     if df is None or df.empty:
         return None
+    if kind in charts_more.KINDS:
+        return charts_more.build(kind, df, x=x, y=y, color=color, size=size, v=v, how=how, top=top, title=title, y2=y2, z=z, height=max(height, 320) if kind.startswith("3D") else height)
     df = df.copy()
     ys = [y] if isinstance(y, str) else list(y or [])
     if kind in ("Grouped column", "Line", "Stacked column", "Column") and len(ys) > 1:
@@ -95,7 +104,7 @@ def build(kind, df, x=None, y=None, color=None, size=None, v=None, how="sum", to
         return _style(ch, title, height if k == "Column" else max(180, 30 * len(d) + 40))
     if k in ("Stacked column", "100% stacked", "Grouped column", "Stacked area", "Line", "Area"):
         dims = [x, color]
-        d = _agg(_fold(df, color) if color else df, dims, [y], how)
+        d = _agg(_fold(df, color) if color else df, dims, [y], how).sort_values(x, kind="stable")   # years and months read left to right
         d[x] = d[x].astype(str)
         if color:
             d[color] = d[color].astype(str)
@@ -151,4 +160,21 @@ def build(kind, df, x=None, y=None, color=None, size=None, v=None, how="sum", to
         lo = base.mark_circle(size=90, color=PALETTE[0], stroke=SURFACE, strokeWidth=2).encode(x=f"{y}:Q", tooltip=[x, _num(y, ",.4f"), _num(y2, ",.4f")])
         hi = base.mark_circle(size=90, color=PALETTE[1], stroke=SURFACE, strokeWidth=2).encode(x=f"{y2}:Q", tooltip=[x, _num(y, ",.4f"), _num(y2, ",.4f")])
         return _style(rule + lo + hi, title, max(180, 30 * len(d) + 50))
+    if k == "Lollipop":
+        d = _agg(df, [x], [y], how).sort_values(y, ascending=False)
+        if top:
+            d = d.head(top)
+        d[x] = d[x].astype(str)
+        base = alt.Chart(d).encode(y=alt.Y(f"{x}:N", sort=None, title=None), x=alt.X(f"{y}:Q", title=None, scale=ysc), tooltip=[x, _num(y, ",.2f")])
+        return _style(base.mark_rule(strokeWidth=3, color=PALETTE[0]).encode(x2=alt.value(0)) + base.mark_circle(size=130, color=PALETTE[0], stroke=SURFACE, strokeWidth=2),
+                      title, max(180, 30 * len(d) + 50))
     raise ValueError(f"Unknown chart type: {kind}")
+
+
+def render(ch, key):
+    """Draw an Altair chart or a Plotly figure, whichever build() returned."""
+    import streamlit as st
+    if isinstance(ch, alt.TopLevelMixin):
+        st.altair_chart(ch, width="stretch", key=key)
+    else:
+        st.plotly_chart(ch, width="stretch", key=key, config={"displaylogo": False, "responsive": True})

@@ -125,7 +125,7 @@ def test_every_page_but_home_has_back_home_and_next(lake):
     at._page_hash = pages["home"]
     at.run()
     assert not [b for b in at.button if str(b.key).startswith("nav_")]
-    assert {b.key for b in at.button if str(b.key).startswith("home_")} >= {"home_continue", "home_ingestion", "home_transformation", "home_reporting", "home_validation"}
+    assert {b.key for b in at.button if str(b.key).startswith("home_")} >= {"home_continue", "home_run_all", "home_ingestion", "home_transformation", "home_reporting", "home_validation"}
 
 
 def test_home_continue_button_follows_real_progress():

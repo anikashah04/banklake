@@ -5,6 +5,7 @@ pandas
 numpy
 pyarrow
 streamlit
+plotly>=5.18
 pytest
 cryptography
 sqlglot

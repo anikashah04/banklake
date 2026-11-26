@@ -175,15 +175,33 @@ def _plot(spec, frames, key):
     ch = charts.build(spec["chart"], f, title=None, **kw)
     if ch is not None:
         st.markdown(f"<div style='font-weight:700;font-size:.92rem;color:{INK};margin:.2rem 0 .5rem 0'>{esc(spec['title'])}</div>", unsafe_allow_html=True)
-        st.altair_chart(ch, width="stretch", key=key)
+        charts.render(ch, key)
+
+
+def _spark(series):
+    """Mini bar chart for a card: one bar per row of the Gold table (at most 14), same blue as the charts."""
+    vals = [float(x) for x in series.dropna().tolist()][:14]
+    if len(vals) < 5 or max(vals) <= 0:   # a handful of bars looks like blobs
+        return ""
+    hi = max(vals)
+    w = 100 / len(vals)
+    bars = "".join(f"<rect x='{i * w + 1:.1f}' y='{22 - 22 * max(v, 0) / hi:.1f}' width='{w - 2:.1f}' height='{22 * max(v, 0) / hi:.1f}' rx='1.5' fill='#257de0' opacity='{0.35 + 0.65 * v / hi:.2f}'/>"
+                   for i, v in enumerate(vals))
+    return f"<svg viewBox='0 0 100 22' preserveAspectRatio='none' style='width:100%;height:26px;margin-top:.35rem'>{bars}</svg>"
 
 
 def _tiles(sp, frames):
+    """KPI cards: the figure, what it is made of, and a mini bar chart of the rows behind it."""
     k = sp.get("kpis", [])
     if not k:
         return
     for col, (label, t, c, how, fmt) in zip(st.columns(len(k)), k):
-        col.metric(label, value(frames[t], c, how, fmt))
+        df = frames[t]
+        n = len(df)
+        note = {"sum": "total", "mean": "average", "max": "highest", "min": "lowest", "nunique": "distinct"}.get(how, "total")
+        spark = _spark(df[c]) if how != "nunique" and pd.api.types.is_numeric_dtype(df[c]) else ""
+        col.markdown(f"<div class='bl-kpi'><div class='k'>{esc(label)}</div><div class='v'>{value(df, c, how, fmt)}</div>"
+                     f"<div class='s'>{note} across {n:,} row{'s' if n != 1 else ''}</div>{spark}</div>", unsafe_allow_html=True)
 
 
 def _grid(sp, frames, name):
@@ -201,7 +219,7 @@ def _main_table(sp, frames, totals=True):
     df = df.sort_values(tspec["sort"], ascending=tspec.get("ascending", False))
     shown = df.head(tspec["top"]) if tspec.get("top") else df
     if totals:
-        tot = {c: "" for c in df.columns}
+        tot = {c: None for c in df.columns}   # None, not "", so numeric columns stay numeric for the table
         first = next((c for c in df.columns if not pd.api.types.is_numeric_dtype(df[c])), df.columns[0])
         tot[first] = "TOTAL (all rows)"
         for c in df.columns:
@@ -264,16 +282,30 @@ ROLES = {  # chart type -> [(role, label, kind of column)]
     "Heatmap": [("x", "Columns", "d"), ("y", "Rows", "d"), ("v", "Value", "m")],
     "Histogram": [("x", "Measure", "m")], "Box plot": [("x", "Category", "d"), ("y", "Measure", "m")],
     "Range": [("x", "Category", "d"), ("y", "Low", "m"), ("y2", "High", "m")],
+    "Lollipop": [("x", "Category", "d"), ("y", "Measure", "m")], "Pie": [("x", "Slices", "d"), ("y", "Measure", "m")],
+    "Treemap": [("x", "Boxes", "d"), ("y", "Size", "m"), ("color", "Group by", "o")], "Sunburst": [("x", "Rings", "d"), ("y", "Size", "m"), ("color", "Group by", "o")],
+    "Radar": [("x", "Spokes", "d"), ("y", "Measure", "m"), ("color", "Split by", "o")], "Gauge": [("y", "Measure", "m"), ("y2", "Out of", "m")],
+    "3D Scatter": [("x", "X measure", "m"), ("y", "Y measure", "m"), ("z", "Z measure", "m"), ("color", "Colour by", "o")],
+    "3D Bubble": [("x", "X measure", "m"), ("y", "Y measure", "m"), ("z", "Z measure", "m"), ("size", "Size", "m"), ("color", "Colour by", "o")],
+    "3D Line": [("x", "X axis", "d"), ("z", "Height", "m"), ("color", "Series", "o")],
+    "3D Column": [("x", "X axis", "d"), ("y", "Y axis", "d"), ("z", "Height", "m")], "3D Surface": [("x", "X axis", "d"), ("y", "Y axis", "d"), ("z", "Height", "m")],
 }
+TOP_KINDS = ("Bar", "Funnel", "Donut", "Column", "Waterfall", "Lollipop", "Pie")
 
 
 def _bi(sp, frames, name, rd):
     tabs = sp["tables"]
     pre = sp["preset"]
-    c0, c1, _ = st.columns([1.4, 1.6, 2.4], vertical_alignment="bottom")
-    t = c0.selectbox("Table", tabs, key=f"bi_t_{name}") if len(tabs) > 1 else tabs[0]
-    kinds = list(charts.KINDS)
-    kind = (c1 if len(tabs) > 1 else c0).selectbox("Chart type", kinds, index=kinds.index(pre["chart"]), key=f"bi_k_{name}")
+    dim_of = {k: "3D" if k in charts.KINDS_3D else "2D" for k in charts.ALL_KINDS}
+    cols0 = st.columns([1.5, 1.0, 1.6, 1.4], vertical_alignment="bottom")
+    t = cols0[0].selectbox("Table", tabs, key=f"bi_t_{name}") if len(tabs) > 1 else tabs[0]
+    if len(tabs) == 1:
+        cols0[0].markdown(f"<div style='font-size:.8rem;color:#6B7280'>Table</div><code>{tabs[0]}</code>", unsafe_allow_html=True)
+    with cols0[1]:
+        st.caption("Chart family")
+        fam = st.segmented_control("Chart family", ["2D", "3D"], default=dim_of[pre["chart"]], key=f"bi_f_{name}", label_visibility="collapsed") or dim_of[pre["chart"]]
+    kinds = charts.KINDS_3D if fam == "3D" else charts.KINDS_2D
+    kind = cols0[2].selectbox(f"Chart type  ({len(kinds)} in {fam})", kinds, index=kinds.index(pre["chart"]) if pre["chart"] in kinds else 0, key=f"bi_k_{name}_{fam}")
     df = frames[t]
     dims, meas = dims_and_measures(df)
     roles = ROLES[kind]
@@ -300,9 +332,9 @@ def _bi(sp, frames, name, rd):
         st.info("Each choice needs a different column. Change one of them.")
         return
     with st.container(border=True):
-        ch = charts.build(kind, df, how=how, top=12 if kind in ("Bar", "Funnel", "Donut", "Column", "Waterfall") else None, **pick)
+        ch = charts.build(kind, df, how=how, top=12 if kind in TOP_KINDS else None, **pick)
         if ch is not None:
-            st.altair_chart(ch, width="stretch", key=f"bi_chart_{name}_{t}_{kind}")
+            charts.render(ch, f"bi_chart_{name}_{t}_{kind}")
     st.caption(f"{len(df):,} rows in {t}. Pick another chart type to see the same numbers a different way.")
     st.download_button("Export CSV", df.drop(columns=[c for c in SKIP if c in df.columns]).to_csv(index=False), f"{t}_{rd}.csv", "text/csv", key=f"rp_csv_{name}")
 

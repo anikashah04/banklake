@@ -25,14 +25,19 @@ def test_every_report_has_a_spec_and_a_kind_with_its_own_layout():
         assert used <= set(v["tables"]), n
 
 
-def test_chart_library_has_seventeen_types_and_each_compiles():
+def test_chart_library_has_twenty_eight_types_and_each_compiles():
     df = pd.DataFrame({"cat": list("ABCABC"), "grp": ["u", "u", "u", "v", "v", "v"], "m": [3, 5, 2, 4, 1, 6], "n": [1.5, 2, 3, 4, 5, 6]})
     spec = {"Column": dict(x="cat", y="m"), "Bar": dict(x="cat", y="m"), "Stacked column": dict(x="cat", y="m", color="grp"), "100% stacked": dict(x="cat", y="m", color="grp"),
             "Grouped column": dict(x="cat", y=["m", "n"]), "Line": dict(x="cat", y="m", color="grp"), "Area": dict(x="cat", y="m"),
             "Stacked area": dict(x="cat", y="m", color="grp"), "Donut": dict(x="cat", y="m"), "Scatter": dict(x="m", y="n", color="cat"),
             "Bubble": dict(x="m", y="n", size="n", color="cat"), "Heatmap": dict(x="cat", y="grp", v="m"), "Histogram": dict(x="m"),
-            "Box plot": dict(x="grp", y="m"), "Waterfall": dict(x="cat", y="m"), "Funnel": dict(x="cat", y="m"), "Range": dict(x="cat", y="m", y2="n")}
-    assert len(charts.KINDS) == 17 and set(spec) == set(charts.KINDS)
+            "Box plot": dict(x="grp", y="m"), "Waterfall": dict(x="cat", y="m"), "Funnel": dict(x="cat", y="m"), "Range": dict(x="cat", y="m", y2="n"),
+            "Lollipop": dict(x="cat", y="m"), "Pie": dict(x="cat", y="m"), "Treemap": dict(x="cat", y="m", color="grp"), "Sunburst": dict(x="cat", y="m"),
+            "Radar": dict(x="cat", y="m", color="grp"), "Gauge": dict(y="m", y2="n"), "3D Scatter": dict(x="m", y="n", z="m", color="grp"),
+            "3D Bubble": dict(x="m", y="n", z="m", size="n", color="grp"), "3D Line": dict(x="cat", z="m", color="grp"),
+            "3D Column": dict(x="cat", y="grp", z="m"), "3D Surface": dict(x="cat", y="grp", z="m")}
+    assert len(charts.ALL_KINDS) == 28 and set(spec) == set(charts.ALL_KINDS)
+    assert len(charts.KINDS_2D) == 23 and len(charts.KINDS_3D) == 5
     for k, kw in spec.items():
         assert charts.build(k, df, **kw).to_dict()
     assert charts.build("Column", df.iloc[0:0], x="cat", y="m") is None
@@ -100,22 +105,23 @@ def test_page_renders_each_report_without_error(loaded, name):
     assert "READY" in text and "NOT READY" not in text
     kind = report.reports()[name]["type"]
     if kind == "Dashboard":
-        assert len(at.metric) >= 2
+        assert sum('bl-kpi' in m.value for m in at.markdown) >= 2
     if kind == "Regulatory":
         assert "PASS" in text
     if kind == "BI":
-        assert any(s.label == "Chart type" for s in at.selectbox)
+        assert any(s.label.startswith("Chart type") for s in at.selectbox)
 
 
 def test_bi_explorer_switches_chart_types(loaded):
     at = AppTest.from_function(_app, default_timeout=180).run()
     at.date_input[0].set_value(datetime.date(2026, 11, 25)).run()
     at.selectbox[0].select("Monthly Transaction Trends").run()
-    ck = [s for s in at.selectbox if s.label == "Chart type"][0]
-    for kind in charts.KINDS:
-        ck.select(kind).run()
-        assert not at.exception, (kind, at.exception)
-        ck = [s for s in at.selectbox if s.label == "Chart type"][0]
+    for fam, kinds in (("2D", charts.KINDS_2D), ("3D", charts.KINDS_3D)):
+        at.segmented_control[0].set_value(fam).run()
+        for kind in kinds:
+            ck = [s for s in at.selectbox if s.label.startswith("Chart type")][0]
+            ck.select(kind).run()
+            assert not at.exception, (kind, at.exception)
 
 
 def test_reporting_page_has_no_stray_bi_dashboards_button(loaded):

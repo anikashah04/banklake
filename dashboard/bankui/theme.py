@@ -93,6 +93,10 @@ hr {{ margin: .6rem 0; }}
 .bl-card .t {{ font-weight:650; color:{INK}; flex:1; }}
 .bl-card .d {{ color:{MUTED}; font-size:.82rem; margin-bottom:.55rem; }}
 .bl-card .f {{ font-size:.84rem; color:{INK}; padding:.12rem 0; }}
+.bl-kpi {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.65rem .85rem .55rem; border-top:3px solid #257de0; margin-bottom:.6rem; min-height:6.4rem; }}
+.bl-kpi .k {{ font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:{MUTED}; }}
+.bl-kpi .v {{ font-size:1.65rem; font-weight:650; color:{INK}; line-height:1.25; }}
+.bl-kpi .s {{ font-size:.76rem; color:{MUTED}; }}
 </style>
 """
 
