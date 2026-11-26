@@ -159,13 +159,15 @@ def parse_date(d) -> date:
     return datetime.strptime(str(d), "%Y-%m-%d").date()
 
 
-def due_loads(business_date) -> list[Load]:
+def due_loads(business_date, history: bool = False) -> list[Load]:
     """Tables to load for a business date, from each table's load frequency.
     DAILY    : the selected date.
     MONTHLY  : on the 1st of a month, the previous month's closing snapshot (period end = the day before).
     QUARTERLY: on the 1st of Jan/Apr/Jul/Oct, the previous quarter's closing snapshot."""
     bd = parse_date(business_date)
     prev_end = bd - timedelta(days=1)
+    if history:
+        return _history_loads(bd)
     out = []
     for r in meta.query("SELECT t.source_id, s.name, t.entity, t.load_frequency FROM source_tables t "
                         "JOIN source_systems s USING(source_id) WHERE t.is_active='Y' ORDER BY t.source_id, t.rowid"):
@@ -176,6 +178,20 @@ def due_loads(business_date) -> list[Load]:
             out.append(Load(r["source_id"], r["name"], r["entity"], f, f"M:{prev_end}", str(prev_end), True))
         elif f == "QUARTERLY" and bd.day == 1 and bd.month in (1, 4, 7, 10):
             out.append(Load(r["source_id"], r["name"], r["entity"], f, f"Q:{prev_end}", str(prev_end), True))
+    return out
+
+
+def _history_loads(bd: date) -> list[Load]:
+    """Catch-up load: every table as a snapshot of all its records up to the date (monthly and quarterly tables up to their latest
+    closed period). Use it once on a fresh lake; after that the normal daily loads continue from the next day."""
+    month_end = bd.replace(day=1) - timedelta(days=1)
+    q_end = date(bd.year, 3 * ((bd.month - 1) // 3) + 1, 1) - timedelta(days=1)
+    out = []
+    for r in meta.query("SELECT t.source_id, s.name, t.entity, t.load_frequency FROM source_tables t "
+                        "JOIN source_systems s USING(source_id) WHERE t.is_active='Y' ORDER BY t.source_id, t.rowid"):
+        f = r["load_frequency"]
+        key, end = {"DAILY": (f"H:{bd}", bd), "MONTHLY": (f"M:{month_end}", month_end), "QUARTERLY": (f"Q:{q_end}", q_end)}[f]
+        out.append(Load(r["source_id"], r["name"], r["entity"], f, key, str(end), True))
     return out
 
 

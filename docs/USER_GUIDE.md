@@ -12,7 +12,8 @@ Think of a water treatment plant. Raw water comes in from the bank's core system
 2. **Build the data.** On the first page press **Build the demo**. It creates fictional Finacle-style source files and runs every pipeline from Bronze to Gold (about two minutes).
 3. **Read the pipeline.** The **ETL Pipeline** page shows Source, then 1 Ingestion (Bronze), 2 Transformation (Silver Merge, Silver Transform, Gold) and 3 Reporting (BI), with live row counts. Bronze and Silver are masked; Gold and BI are unmasked.
 4. **Open each part.** Use the buttons under the diagram: **1 Ingestion** has the Start Ingestion button for the three source systems, **2 Transformation** shows the whole pipeline: pick Silver or Gold, search for a transformation (named after its target table) and press Run (View Details shows the Teradata, Athena and EMR code), **3 Reporting and BI** shows the Gold tables and the dashboards.
-5. **Validate.** Open **Validation** and press **Run validation now** to compare record counts between the source and each layer.
+5. **Run the three pages in order.** **1 Ingestion**: on a fresh lake press **Load History** once, then **Start Ingestion** loads one day at a time. **2 Transformation**: the date carries over; press **Run** for one table or **Run All** for the layer (tables without Bronze data are skipped, missing upstream tables run first). **3 Reporting and BI**: pick a report, press **Load Report Data** if needed, then download the CSV. Each page ends with a **Next** button once its work is done.
+6. **Validate.** Open **Validation** and press **Run validation now** to compare record counts between the source and each layer.
 
 ## Layout of the console
 

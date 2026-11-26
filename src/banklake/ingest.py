@@ -370,13 +370,13 @@ def _overall(tables) -> str:
     return "SUCCESS"
 
 
-def run(business_date, pace: float = 0.0, hooks: dict | None = None, progress: Progress | None = None) -> dict:
+def run(business_date, pace: float = 0.0, hooks: dict | None = None, progress: Progress | None = None, history: bool = False) -> dict:
     """Ingest every table due on `business_date` from all three sources into Bronze. Blocking."""
     global _CURRENT
     meta.init_db()
     sources.ensure_sources()
     bd = str(sources.check_business_date(business_date))
-    loads = sources.due_loads(bd)
+    loads = sources.due_loads(bd, history)
     run_id = "ING-" + time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4]
     prog = progress or Progress(run_id, bd, loads)
     prog.run_id = run_id
@@ -400,7 +400,7 @@ def run(business_date, pace: float = 0.0, hooks: dict | None = None, progress: P
     return prog.snapshot()
 
 
-def start(business_date, pace: float = 0.0) -> bool:
+def start(business_date, pace: float = 0.0, history: bool = False) -> bool:
     """Run in a background thread (the page polls current()). False if a run is already going."""
     global _THREAD, _CURRENT
     if running():
@@ -408,9 +408,9 @@ def start(business_date, pace: float = 0.0) -> bool:
     meta.init_db()
     sources.ensure_sources()
     bd = str(sources.check_business_date(business_date))
-    prog = Progress("starting", bd, sources.due_loads(bd))
+    prog = Progress("starting", bd, sources.due_loads(bd, history))
     _CURRENT = prog
-    _THREAD = threading.Thread(target=run, kwargs=dict(business_date=bd, pace=pace, progress=prog), daemon=True)
+    _THREAD = threading.Thread(target=run, kwargs=dict(business_date=bd, pace=pace, progress=prog, history=history), daemon=True)
     _THREAD.start()
     return True
 

@@ -5,14 +5,12 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from banklake import meta, sources
-from banklake.common import layer_path
-from banklake.schemas import FIRST_BUSINESS_DATE
+from banklake import meta
 from banklake.transform import catalog, engine
 
 from ..components import badge, table
 from . import charts
-from .etl import ARROW, INK, LINE, MUTE, esc
+from .etl import ARROW, INK, MUTE, esc
 from .report_specs import SPECS, TYPE_NOTE
 
 BAD = ("FAILED", "BLOCKED")
@@ -159,13 +157,6 @@ def _details(name, info, rd):
     with t[5]:
         rows = [r for r in engine.audit_rows(layer="gold", limit=400) if r["target_table_name"] in tabs][:60]
         table(pd.DataFrame(rows), height=340) if rows else st.caption("No audit rows for these tables yet.")
-
-
-@st.dialog("BI Dashboards", width="large")
-def _bi_dashboards():
-    from .. import helpers, legacy
-    st.caption("The original BI dashboards. They read the earlier Gold tables, not the ones loaded on the Transformation page.")
-    legacy.render("BI dashboards", helpers.current_role())
 
 
 # ------------------------------------------------------------------ page
@@ -319,41 +310,80 @@ def _bi(sp, frames, name, rd):
 LAYOUT = {"Dashboard": _dashboard, "Report": _report, "Regulatory": _regulatory, "BI": _bi}
 
 
+@st.fragment(run_every=0.5)
+def _progress():
+    run = engine.current()
+    if run and engine.running():
+        its = run["items"]
+        st.session_state["_rp_was_running"] = True
+        st.info(f"Loading the report tables: {sum(i['status'] in ('SUCCESS', 'FAILED', 'BLOCKED') for i in its)} of {len(its)} finished"
+                f"{' · now ' + run['current'] if run['current'] else ''}")
+    else:
+        st.rerun()
+
+
+def _last_error(t, rd):
+    r = meta.query("SELECT error_message FROM layer_audit_log WHERE layer='gold' AND target_table_name=? AND report_date=? ORDER BY id DESC LIMIT 1", (t, rd))
+    return (r[0]["error_message"] or "") if r else ""
+
+
 def page():
-    st.markdown("<div style='color:#172334;font-weight:800;font-size:2rem;line-height:1.2;margin:0 0 1rem 0;letter-spacing:-.01em'>Reporting</div>",
-                unsafe_allow_html=True)
+    from banklake import ingest
+
+    from .. import flow
     meta.init_db()
-    if not any(any(layer_path("bronze", e).glob("*.parquet")) for e in ("customer", "account")):
-        _none()
+    if not flow.has_bronze():
+        flow.no_data()
         return
     cat = reports()
-    latest = sources.latest_business_date()
-    c1, c2, c3, c4 = st.columns([1.1, 3.0, 1.0, 1.3], vertical_alignment="bottom")
-    bd = c1.date_input("Report date", value=latest, min_value=date.fromisoformat(FIRST_BUSINESS_DATE), max_value=latest, format="DD/MM/YYYY", key="rp_date")
+    busy = engine.running()
+    c1, c2, c3, c4 = st.columns([1.1, 3.0, 1.3, 1.0], vertical_alignment="bottom")
+    with c1:
+        bd = flow.pick_date("Report date", "rp_date")
     name = c2.selectbox(f"Report  ({len(cat)})", list(cat), format_func=lambda n: f"{n}   ·   {cat[n]['type']}", key="rp_report")
-    det_b = c3.button("View Details", width="stretch", key="rp_details")
-    bi_b = c4.button("BI Dashboards", width="stretch", key="rp_bi")
     rd, info = bd.isoformat(), cat[name]
     states = {t: table_state(t, rd) for t in info["tables"]}
+    ready = all(s == "done" for s, _ in states.values())
+    stale = flow.ingested_through() is None or bd > flow.ingested_through()
+    load_b = c3.button("Load Report Data", type="primary", width="stretch", key="rp_load", disabled=ready or busy or stale or ingest.running(),
+                       help="Run the Gold tables this report needs (and anything they depend on) for this date")
+    det_b = c4.button("View Details", width="stretch", key="rp_details")
+    if load_b:
+        try:
+            engine.start("gold", rd, info["tables"])
+        except ValueError as e:
+            st.error(str(e))
+            return
+        st.rerun()
     if det_b:
         _details(name, info, rd)
-    if bi_b:
-        _bi_dashboards()
     with st.container(border=True):
         st.image(_svg(name, info, rd, states), width="stretch")
-    ready = all(s == "done" for s, _ in states.values())
     failed = [t for t, (s, _) in states.items() if s == "failed"]
-    waiting = [t for t, (s, _) in states.items() if s == "waiting"]
     with st.container(border=True):
         a, b = st.columns([4, 1.4], vertical_alignment="center")
         a.markdown(f"<div style='font-weight:800;font-size:1.15rem;color:{INK}'>{esc(name)}</div>"
                    f"<div style='color:{MUTE};font-size:.88rem'>{esc(info['type'])} · {esc(TYPE_NOTE[info['type']])}<br>Built from "
                    + ", ".join(f"<code>{esc(t)}</code>" for t in info["tables"]) + "</div>", unsafe_allow_html=True)
         b.markdown(f"<div style='text-align:right'>{badge('READY' if ready else 'FAILED' if failed else 'NOT READY')}</div>", unsafe_allow_html=True)
-    if failed:
-        st.error("Failed to load: " + ", ".join(failed) + ". Open the Transformation page for the reason.")
-    if waiting:
-        st.info("Not loaded for this report date: " + ", ".join(waiting) + ". Run it on the Transformation page, or pick another report date.")
-    if not ready:
+    if busy:
+        _progress()
         return
-    LAYOUT[info["type"]](SPECS[name], _frames(info["tables"], rd), name, rd)
+    if st.session_state.pop("_rp_was_running", False):
+        st.cache_data.clear()
+        st.rerun()
+    if stale and not ready:
+        flow.not_ingested(bd)
+        return
+    if failed:
+        st.error("Could not load: " + "; ".join(f"{t} ({_last_error(t, rd) or 'see the Transformation page'})" for t in failed))
+        flow.go("Open Transformation", "transformation", "rp_to_tr")
+        return
+    if not ready:
+        st.info("This report has not been loaded for this date. Press Load Report Data.")
+        return
+    frames = _frames(info["tables"], rd)
+    if all(f.empty for f in frames.values()):
+        st.info("This report has no rows for this date. Bronze may not hold data this early; try a later date.")
+        return
+    LAYOUT[info["type"]](SPECS[name], frames, name, rd)

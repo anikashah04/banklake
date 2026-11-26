@@ -6,9 +6,8 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from banklake import meta, sources
+from banklake import meta
 from banklake.common import layer_path
-from banklake.schemas import FIRST_BUSINESS_DATE
 from banklake.transform import catalog, engine
 
 from ..components import badge, table
@@ -91,7 +90,7 @@ def _svg(pid, rd, run):
 
     # Bronze
     o.append(f'<rect x="8" y="24" width="108" height="166" rx="10" fill="#FFFFFF" stroke="{ARROW["done"] if b_ok else ARROW["failed"]}" stroke-width="1.8"/>')
-    o.append(f'<text x="22" y="52" font-size="12" font-weight="700" letter-spacing=".08em" fill="#374151">BRONZE</text>')
+    o.append('<text x="22" y="52" font-size="12" font-weight="700" letter-spacing=".08em" fill="#374151">BRONZE</text>')
     o.append(f'<text x="22" y="80" font-size="22" font-weight="800" fill="{INK}">{len(bronze)}</text>')
     o.append(f'<text x="22" y="98" font-size="12" fill="#374151">table{"s" if len(bronze) != 1 else ""} read</text>')
     o.append(f'<text x="22" y="130" font-size="11" fill="{MUTE}">PII masked</text><text x="22" y="145" font-size="11" fill="{MUTE}">here only</text>')
@@ -238,10 +237,6 @@ def _migration():
 
 
 # ------------------------------------------------------------------ page
-def _none():
-    st.markdown("#### No data in the lake yet")
-    st.write("The transformation procedures read the Bronze tables. Run the Ingestion page first, then come back here.")
-
 
 def _view(pid, rd):
     run = engine.current()
@@ -253,6 +248,8 @@ def _view(pid, rd):
             its = run["items"]
             st.caption(f"{sum(i['status'] in ('SUCCESS', 'FAILED', 'BLOCKED') for i in its)} of {len(its)} finished · now: {run['current'] or '-'}")
         else:
+            if run.get("skipped"):
+                st.caption(f"{len(run['skipped'])} tables were left out because their Bronze data does not exist yet.")
             for i in run["items"]:
                 if i["status"] in BAD:
                     st.error(f"{i['target']}: {i['status'].lower()}. {i['error']}")
@@ -269,28 +266,47 @@ def _live_fragment(pid, rd):
 
 
 def page():
-    st.markdown("<div style='color:#172334;font-weight:800;font-size:2rem;line-height:1.2;margin:0 0 1rem 0;letter-spacing:-.01em'>Transformation Pipeline</div>",
-                unsafe_allow_html=True)
+    from .. import flow
     meta.init_db()
-    if not any(any(layer_path("bronze", e).glob("*.parquet")) for e in ("customer", "account")):
-        _none()
+    if not flow.has_bronze():
+        flow.no_data()
         return
-    latest = sources.latest_business_date()
+    run = engine.current()
     busy = engine.running()
-    c1, c2, c3, c4, c5, c6 = st.columns([1.1, 1.0, 2.6, 0.7, 1.0, 1.3], vertical_alignment="bottom")
-    bd = c1.date_input("Report date", value=latest, min_value=date.fromisoformat(FIRST_BUSINESS_DATE), max_value=latest, format="DD/MM/YYYY", key="tr_date")
-    group = c2.segmented_control("Layer", list(catalog.GROUPS), default="Silver", key="tr_group", disabled=busy, label_visibility="visible") or "Silver"
+    if busy and run:                       # coming back to the page mid-run: show the run, not the default pick
+        fp = catalog.BY_ID[run["focus"]]
+        grp = "Gold" if fp["layer"] == "gold" else "Silver"
+        st.session_state["tr_group"], st.session_state[f"tr_proc_{grp}"] = grp, run["focus"]
+        if run["report_date"] != str(st.session_state.get(flow.KEY)):
+            st.session_state[flow.KEY] = date.fromisoformat(run["report_date"])
+            st.session_state.pop("tr_date", None)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1.1, 1.0, 2.4, 0.6, 0.8, 0.9, 1.3], vertical_alignment="bottom")
+    with c1:
+        bd = flow.pick_date("Report date", "tr_date")
+    group = c2.segmented_control("Layer", list(catalog.GROUPS), default="Silver", key="tr_group", disabled=busy) or "Silver"
     procs = [p for l in catalog.GROUPS[group] for p in catalog.procs_for(l)]
     ids = [p["proc_id"] for p in procs]
     lab = {p["proc_id"]: f"{p['target']}   ·   {TITLE[p['layer']]}" for p in procs}
     pid = c3.selectbox(f"Transformation  ({len(procs)})", ids, format_func=lab.get, key=f"tr_proc_{group}", disabled=busy)
-    run_b = c4.button("Run", type="primary", width="stretch", disabled=busy, key="tr_run")
-    det_b = c5.button("View Details", width="stretch", key="tr_details")
-    mig_b = c6.button("SQL Migration Tool", width="stretch", key="tr_mig")
     rd = bd.isoformat()
-    if run_b:
+    from banklake import ingest
+    stale = flow.ingested_through() is None or bd > flow.ingested_through()
+    block = busy or stale or ingest.running()
+    run_b = c4.button("Run", type="primary", width="stretch", disabled=block, key="tr_run")
+    all_b = c5.button("Run All", width="stretch", disabled=block, key="tr_all", help=f"Load every {group} table for this date")
+    det_b = c6.button("View Details", width="stretch", key="tr_details")
+    mig_b = c7.button("SQL Migration Tool", width="stretch", key="tr_mig")
+    if stale:
+        flow.not_ingested(bd)
+    elif ingest.running():
+        st.info("Ingestion is running. Transformation can start when it finishes.")
+    if run_b or all_b:
+        p = catalog.BY_ID[pid]
         try:
-            engine.start(catalog.BY_ID[pid]["layer"], rd, [catalog.BY_ID[pid]["target"]])
+            if run_b:
+                engine.start(p["layer"], rd, [p["target"]])
+            else:
+                engine.start(catalog.GROUPS[group][-1], rd, None)
         except ValueError as e:
             st.error(str(e))
             return
@@ -305,3 +321,6 @@ def page():
     if st.session_state.pop("_tr_was_running", False):
         st.cache_data.clear()
     _view(pid, rd)
+    if engine.loaded(catalog.BY_ID[pid]["target"], catalog.BY_ID[pid]["layer"], rd):
+        if catalog.BY_ID[pid]["layer"] == "gold":
+            flow.go("Next: Reporting", "reporting", "tr_next", primary=True)

@@ -100,6 +100,23 @@ def blocked_by(pid, report_date):
     return missing
 
 
+def block_message(missing, report_date):
+    """Plain wording for tables that are not ready: Bronze needs Ingestion, anything else needs its own transformation first."""
+    bronze = [m.split(".", 1)[1] for m in missing if m.startswith("bronze.")]
+    other = [m for m in missing if not m.startswith("bronze.")]
+    parts = []
+    if bronze:
+        parts.append("No Bronze data yet for " + ", ".join(bronze) + ". Run Ingestion on a date when they are due")
+    if other:
+        parts.append("Not loaded yet for " + report_date + ": " + ", ".join(other))
+    return ". ".join(parts) + "."
+
+
+def runnable(pid):
+    """True when every Bronze table this procedure (and everything upstream of it) reads already holds data."""
+    return not any(blocked_by(q["proc_id"], "") for q in catalog.upstream(pid) + [catalog.BY_ID[pid]] if q["source_db"] == "bronze")
+
+
 # ------------------------------------------------------------------ one procedure
 def _args(p, report_date):
     cat = "bl" if runtime.use_iceberg() else "glue_catalog"
@@ -120,7 +137,7 @@ def run_proc(pid, report_date, order_id, spark=None, convert_first=True):
         art = generate_emr(pid)
     missing = blocked_by(pid, report_date)
     if missing:
-        msg = "Waiting for " + ", ".join(missing) + f" for {report_date}"
+        msg = block_message(missing, report_date)
         _audit(order_id, p["layer"], ",".join(missing), p["target"], "BLOCKED", 0, 0, 0, msg, report_date)
         return dict(status="BLOCKED", rows_in=0, rows_out=0, error=msg)
     if spark is None:
@@ -157,24 +174,31 @@ def current():
 
 
 def start(layer, report_date, targets=None, with_upstream=True):
-    """Run procedures in the background. targets=None runs the whole layer; otherwise the listed targets of that layer, preceded by any
-    upstream procedure (Silver Merge, Silver Transform) that has not been loaded for this report date yet."""
+    """Run procedures in the background. targets=None runs the whole layer (skipping tables whose Bronze data does not exist yet);
+    otherwise the listed targets of that layer. Either way any upstream procedure not yet loaded for this report date runs first."""
     global _thread
     with _lock:
         if running():
             raise ValueError("A transformation run is already in progress.")
         procs = [p for p in catalog.procs_for(layer) if targets is None or p["target"] in targets]
+        skipped = []
+        if targets is None:
+            skipped = [p["target"] for p in procs if not runnable(p["proc_id"])]
+            procs = [p for p in procs if p["target"] not in skipped]
         chosen = {p["proc_id"] for p in procs}
-        if targets is not None and with_upstream:
+        if with_upstream:
             ups = {}
             for p in procs:
                 for q in catalog.upstream(p["proc_id"]):
                     if q["proc_id"] not in chosen and not loaded(q["target"], q["layer"], report_date):
                         ups[q["proc_id"]] = q
             procs = sorted(list(ups.values()) + procs, key=lambda q: q["order"])
+        if not procs:
+            raise ValueError("Nothing to run: the Bronze data these tables need has not been ingested yet.")
         order = new_order_id()
+        focus = (catalog.BY_TARGET[(layer, sorted(targets)[0])]["proc_id"] if targets else procs[-1]["proc_id"])
         _state["run"] = dict(order_id=order, layer=layer, report_date=report_date, status="RUNNING", started=time.time(), ended=None, error=None,
-                             current=None, kind="LAYER" if targets is None else "PROC", targets=sorted(chosen),
+                             current=None, kind="LAYER" if targets is None else "PROC", targets=sorted(chosen), focus=focus, skipped=skipped,
                              items=[dict(proc_id=p["proc_id"], layer=p["layer"], target=p["target"], stage="Waiting", status="WAITING",
                                          rows_in=0, rows_out=0, error=None) for p in procs])
     _thread = threading.Thread(target=_work, args=(order,), daemon=True)

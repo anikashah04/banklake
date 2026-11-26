@@ -5,7 +5,6 @@ import streamlit as st
 
 from banklake.sqlmigrate import procs
 
-from ..components import badge, note
 
 EX = Path(__file__).resolve().parents[3] / "sql_examples" / "proc_refresh_customer_summary.sql"
 

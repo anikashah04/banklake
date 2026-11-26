@@ -2,7 +2,6 @@
 Rules kept here: one y-axis (never dual), categories coloured in a fixed order and never cycled (9th+ folds into "Other"),
 thin marks with rounded data ends, a surface-coloured gap between stacked fills, recessive grid, tooltips on every mark."""
 import altair as alt
-import pandas as pd
 
 # categorical slots 1-8 (light surface), passed through the palette validator: adjacent CVD and normal-vision checks pass
 PALETTE = ["#257de0", "#f47230", "#00b894", "#f2a600", "#ee7fac", "#008a17", "#6a4ce2", "#ec4647"]

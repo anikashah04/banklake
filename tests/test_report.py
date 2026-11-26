@@ -118,12 +118,11 @@ def test_bi_explorer_switches_chart_types(loaded):
         ck = [s for s in at.selectbox if s.label == "Chart type"][0]
 
 
-def test_bi_dashboards_button_opens_its_dialog(loaded):
-    """Regression: the dialog function was shadowed by the BI explorer function of the same name."""
+def test_reporting_page_has_no_stray_bi_dashboards_button(loaded):
     at = AppTest.from_function(_app, default_timeout=180).run()
-    [b for b in at.button if b.label == "BI Dashboards"][0].click().run()
     assert not at.exception, at.exception
-    assert callable(report._bi_dashboards) and report._bi is not report._bi_dashboards
+    assert not [b for b in at.button if b.label == "BI Dashboards"]
+    assert report._bi is not getattr(report, "_bi_dashboards", None)
 
 
 def _transform_app():

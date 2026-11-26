@@ -101,3 +101,12 @@ Demo-grade crypto: the key comes from `BANKLAKE_MASK_KEY`; in production it woul
 Keep this project and your internship report separate. Use fictional names only, write everything from scratch, and
 confirm with your Deloitte mentor what may be described before submission. Do not add client names, internal schemas,
 procedure names, screenshots, logs or configuration.
+
+
+## Using the three pages in order
+
+1. **1 Ingestion**: pick a business date. On a fresh lake press **Load History** once to bring in every record up to that date; after that **Start Ingestion** loads one day at a time. **Dry Run** shows the steps without writing. When it finishes, **Next: Transformation** appears.
+2. **2 Transformation**: the date carries over from Ingestion. Choose Silver or Gold, pick a table and press **Run**, or **Run All** for the whole layer. Tables whose Bronze data is not loaded yet are skipped with a plain message, and missing upstream tables are run first. **View Details** shows the Teradata and Athena SELECTs, the EMR PySpark script, target data, metadata and audit log. **Next: Reporting** appears when the layer is done.
+3. **3 Reporting and BI**: same date again. Pick a report (Dashboard, Report, Regulatory or BI), press **Load Report Data** if Gold is not loaded for that date, and read it. Every report has a CSV download; BI lets you choose the chart type, measure and breakdown.
+
+Personal data is masked at Bronze and stays masked in every later layer of this flow. The older Overview and Validation pages still describe the earlier pipeline.

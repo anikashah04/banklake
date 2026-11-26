@@ -130,7 +130,7 @@ def test_future_business_dates_are_rejected(sc):
     assert "available only up to" in sc["future"] and sc["future_start"] == "REJECTED"
 
 
-def test_ingestion_page_warns_and_disables_the_button_for_a_future_date(tmp_path):
+def test_ingestion_date_picker_stops_at_yesterday(tmp_path):
     code = f"""
 import datetime
 from streamlit.testing.v1 import AppTest
@@ -138,13 +138,38 @@ at = AppTest.from_file({str(Path(__file__).resolve().parents[1] / 'dashboard' / 
 pages = {{(i['url_pathname'] or 'overview'): h for h, i in at._registered_pages.items() if 'url_pathname' in i}}
 at._page_hash = pages['ingestion']; at.run()
 assert not at.exception
-btn = [b for b in at.button if b.label == 'Start Ingestion'][0]
-assert not btn.disabled
-at.date_input[0].set_value(datetime.date.today() + datetime.timedelta(days=3)).run()
-assert any('available only up to' in w.value for w in at.warning), [w.value for w in at.warning]
-assert [b for b in at.button if b.label == 'Start Ingestion'][0].disabled
+assert not [b for b in at.button if b.label == 'Start Ingestion'][0].disabled
+assert at.date_input[0].max == datetime.date.today() - datetime.timedelta(days=1), at.date_input[0].max
+assert any('Load History' in c.value for c in at.caption)           # first-time hint on a fresh lake
 """
     env = {**os.environ, "BANKLAKE_HOME": str(tmp_path)}
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=900)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
+
+
+def test_load_history_brings_in_every_record_up_to_the_date_and_daily_loads_continue(tmp_path):
+    code = """
+import duckdb
+from datetime import date
+from banklake import meta, sources, ingest
+from banklake.common import LAKE
+meta.init_db(); sources.ensure_sources()
+h = sources.due_loads(date(2026, 7, 15), history=True)
+assert len(h) == 23 and all(l.snapshot for l in h) and {l.period_key for l in h if l.frequency == 'MONTHLY'} == {'M:2026-06-30'}
+assert {l.period_key for l in h if l.frequency == 'QUARTERLY'} == {'Q:2026-06-30'}
+r = ingest.run(date(2026, 7, 15), history=True)
+assert r['status'] == 'SUCCESS', r['status']
+con = sources.connect('SOURCE 2'); n_src = con.execute("SELECT count(*) FROM customer WHERE business_date <= '2026-07-15'").fetchone()[0]; con.close()
+n_b = duckdb.connect().execute(f"SELECT count(*) FROM read_parquet('{LAKE}/bronze/customer/*.parquet')").fetchone()[0]
+assert n_b == n_src and n_b > 50, (n_b, n_src)
+r2 = ingest.run(date(2026, 7, 15), history=True)                    # same date again: nothing is loaded twice
+assert all(t['status'] == 'SKIPPED' for t in r2['tables'])
+r3 = ingest.run(date(2026, 7, 16))                                  # the next normal day continues from there
+assert r3['status'] == 'SUCCESS'
+n_after = duckdb.connect().execute(f"SELECT count(*) FROM read_parquet('{LAKE}/bronze/customer/*.parquet')").fetchone()[0]
+assert n_after >= n_b
+"""
+    env = {**os.environ, "BANKLAKE_HOME": str(tmp_path), "BANKLAKE_SOURCE_SCALE": "small", "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=900)
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
