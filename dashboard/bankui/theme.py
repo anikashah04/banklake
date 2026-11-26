@@ -8,7 +8,7 @@ STATUS = {  # status -> (text colour, background)
     "RUNNING": ("#2F5D8A", "#E3ECF5"), "BLOCKED": ("#8A5A12", "#FBF0DC"), "MEDIUM": ("#8A5A12", "#FBF0DC"), "WARNING": ("#8A5A12", "#FBF0DC"),
     "SKIPPED": ("#5E6B7D", "#ECEFF3"), "NOT RUN": ("#5E6B7D", "#ECEFF3"), "LOW": ("#5E6B7D", "#ECEFF3"), "INFO": ("#2F5D8A", "#E3ECF5"),
     "COMPLETED": ("#1E6B49", "#E3F1EA"), "READY": ("#1E6B49", "#E3F1EA"), "NOT READY": ("#5E6B7D", "#ECEFF3"), "WARNINGS": ("#8A5A12", "#FBF0DC"), "NOT STARTED": ("#5E6B7D", "#ECEFF3"),
-    "NOT CONFIGURED": ("#5E6B7D", "#ECEFF3"), "PLANNED": ("#5E6B7D", "#ECEFF3"), "UNAVAILABLE": ("#5E6B7D", "#ECEFF3"),
+    "PARTIAL": ("#8A5A12", "#FBF0DC"), "NOT CONFIGURED": ("#5E6B7D", "#ECEFF3"), "PLANNED": ("#5E6B7D", "#ECEFF3"), "UNAVAILABLE": ("#5E6B7D", "#ECEFF3"),
     "NOT ENABLED": ("#5E6B7D", "#ECEFF3"), "NO DATA": ("#5E6B7D", "#ECEFF3"),
 }
 
@@ -85,6 +85,14 @@ button[kind="primary"] {{ background:{ACCENT}; border-color:{ACCENT}; }}
 [data-testid="stExpander"] {{ border:1px solid {LINE}; border-radius:3px; }}
 [data-testid="stExpander"] summary {{ font-size:.82rem; }}
 hr {{ margin: .6rem 0; }}
+
+/* home cards */
+.bl-card {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.8rem .9rem; min-height:11rem; margin-bottom:.5rem; }}
+.bl-card .h {{ display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }}
+.bl-card .n {{ width:1.4rem; height:1.4rem; border-radius:50%; background:{ACCENT}; color:#fff; font-size:.75rem; font-weight:650; display:flex; align-items:center; justify-content:center; }}
+.bl-card .t {{ font-weight:650; color:{INK}; flex:1; }}
+.bl-card .d {{ color:{MUTED}; font-size:.82rem; margin-bottom:.55rem; }}
+.bl-card .f {{ font-size:.84rem; color:{INK}; padding:.12rem 0; }}
 </style>
 """
 

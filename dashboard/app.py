@@ -16,7 +16,7 @@ st.set_page_config(page_title="BankLake", page_icon=":material/database:", layou
 
 from bankui import helpers, nav, state, theme  # noqa: E402
 from bankui.components import badge  # noqa: E402
-from bankui.views import etl  # noqa: E402
+from bankui.views import etl, home  # noqa: E402
 from banklake import meta  # noqa: E402
 
 meta.init_db()
@@ -25,25 +25,29 @@ st.logo(str(HERE / "assets" / "banklake_logo.svg"), size="large")
 
 P = st.Page
 pages = {
-    "overview": P(etl.home, title="ETL Pipeline", icon=":material/account_tree:", url_path="overview", default=True),
+    "home": P(home.page, title="Home", icon=":material/home:", url_path="", default=True),
     "ingestion": P(etl.ingestion, title="1  Ingestion", icon=":material/upload_file:", url_path="ingestion"),
     "transformation": P(etl.transformation, title="2  Transformation", icon=":material/transform:", url_path="transformation"),
     "reporting": P(etl.reporting, title="3  Reporting and BI", icon=":material/bar_chart:", url_path="reporting"),
     "validation": P(etl.validation, title="Validation", icon=":material/fact_check:", url_path="validation"),
+    "overview": P(etl.home, title="Pipeline Overview", icon=":material/account_tree:", url_path="overview"),
 }
 nav.PAGES.update(pages)
-current = st.navigation(list(pages.values()), position="sidebar", expanded=True)
+SECTIONS = {"": ["home"], "Pipeline": ["ingestion", "transformation", "reporting"], "Checks": ["validation", "overview"]}
+current = st.navigation({k: [pages[x] for x in v] for k, v in SECTIONS.items()}, position="sidebar", expanded=True)
 
 with st.sidebar:
     st.caption("Personal data is masked at Bronze and stays masked in every later layer.")
     st.caption("Synthetic data only. Independent academic project; no client data or code.")
 
 # ------------------------------------------------------------------ header bar
-SUBTITLE = {"ingestion": "Load one business day from the three source systems into Bronze. Personal data is masked here.",
+SUBTITLE = {"home": "Pick up where you left off, or open any step.",
+            "validation": "Check that record counts match between the source and every layer.",
+            "ingestion": "Load one business day from the three source systems into Bronze. Personal data is masked here.",
             "transformation": "Turn Bronze into Silver and Gold tables for a report date.",
             "reporting": "Read the Gold tables as reports, dashboards and BI analysis."}
-key = next((k for k, p in pages.items() if p is current), "overview")
-legacy_page = key in ("overview", "validation")
+key = next((k for k, p in pages.items() if p is current), "home")
+legacy_page = key in ("overview", "validation")   # these two still show the run header and Actions
 hs = state.header_state()
 bar, refresh_col, actions_col = st.columns([9, 1.1, 1.2] if legacy_page else [9, 1.1, 0.01], vertical_alignment="center", gap="small")
 meta_html = ""
@@ -83,3 +87,20 @@ if "_last_action" in st.session_state:
         st.code(out)
 
 current.run()
+
+# ------------------------------------------------------------------ the same way forward and back on every page
+FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
+if key == "overview":
+    st.divider()
+    if st.columns([1, 2])[0].button("Home", key="nav_home", width="stretch"):
+        nav.open_page("home")
+elif key in FLOW and key != "home":
+    i = FLOW.index(key)
+    st.divider()
+    back, mid, fwd = st.columns([1, 1, 1])
+    if back.button(f"← {pages[FLOW[i - 1]].title.strip()}", key="nav_back", width="stretch"):
+        nav.open_page(FLOW[i - 1])
+    if mid.button("Home", key="nav_home", width="stretch"):
+        nav.open_page("home")
+    if i < len(FLOW) - 1 and fwd.button(f"{pages[FLOW[i + 1]].title.strip()} →", key="nav_next", width="stretch"):
+        nav.open_page(FLOW[i + 1])

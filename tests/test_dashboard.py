@@ -4,15 +4,15 @@ from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 APP = str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py")
-NAV = ["overview", "ingestion", "transformation", "reporting", "validation"]
+NAV = ["home", "ingestion", "transformation", "reporting", "validation", "overview"]
 
 
 def _pages(at):
     """url_path -> page hash, as registered by st.navigation on the first run (callable pages, so no file to switch to)."""
-    return {(info["url_pathname"] or "overview"): h for h, info in at._registered_pages.items() if "url_pathname" in info}
+    return {(info["url_pathname"] or "home"): h for h, info in at._registered_pages.items() if "url_pathname" in info}
 
 
-def test_navigation_is_the_five_pages_in_order(lake):
+def test_navigation_is_home_then_the_pipeline_pages(lake):
     at = AppTest.from_file(APP, default_timeout=120).run()
     assert not at.exception, [e.value for e in at.exception]
     pages = _pages(at)
@@ -58,15 +58,17 @@ def test_every_page_survives_an_empty_lake(tmp_path):
     code = f"""
 from streamlit.testing.v1 import AppTest
 at = AppTest.from_file({APP!r}, default_timeout=120).run()
-pages = {{(i['url_pathname'] or 'overview'): h for h, i in at._registered_pages.items() if 'url_pathname' in i}}
-assert len(pages) == 5, pages
+pages = {{(i['url_pathname'] or 'home'): h for h, i in at._registered_pages.items() if 'url_pathname' in i}}
+assert len(pages) == 6, pages
 bad = []
 for name, h in pages.items():
     at._page_hash = h
     at.run()
     if at.exception:
         bad.append((name, [e.value for e in at.exception]))
-    if name != 'ingestion':   # Ingestion has its own source databases, so it works before anything else exists
+    if name == 'home':
+        assert any(b.label == 'Start with Ingestion' for b in at.button), 'Home must point a first-time user to Ingestion'
+    elif name != 'ingestion':   # Ingestion has its own source databases, so it works before anything else exists
         assert any('No data in the lake yet' in m.value for m in at.markdown), name
     else:
         assert any(b.label == 'Start Ingestion' for b in at.button), 'Start Ingestion button missing'
@@ -91,7 +93,7 @@ def test_every_safe_button_on_every_page_does_something(lake):
         at._page_hash = h
         at.run()
         for label, key in [(b.label, b.key) for b in at.button]:
-            if any(w in label.lower() for w in SLOW):
+            if any(w in label.lower() for w in SLOW) or str(key).startswith(("nav_", "home_")):
                 continue
             at._page_hash = h
             at.run()
@@ -108,3 +110,34 @@ def test_every_safe_button_on_every_page_does_something(lake):
                 problems.append((name, label, [x.value[:120] for x in at.exception]))
     assert clicked >= 4, clicked
     assert not problems, problems
+
+
+def test_every_page_but_home_has_back_home_and_next(lake):
+    expect = {"ingestion": ["← Home", "Home", "2  Transformation →"], "transformation": ["← 1  Ingestion", "Home", "3  Reporting and BI →"],
+              "reporting": ["← 2  Transformation", "Home", "Validation →"], "validation": ["← 3  Reporting and BI", "Home"], "overview": ["Home"]}
+    at = AppTest.from_file(APP, default_timeout=120).run()
+    pages = _pages(at)
+    for name, labels in expect.items():
+        at._page_hash = pages[name]
+        at.run()
+        have = [b.label for b in at.button if str(b.key).startswith("nav_")]
+        assert have == labels, (name, have)
+    at._page_hash = pages["home"]
+    at.run()
+    assert not [b for b in at.button if str(b.key).startswith("nav_")]
+    assert {b.key for b in at.button if str(b.key).startswith("home_")} >= {"home_continue", "home_ingestion", "home_transformation", "home_reporting", "home_validation"}
+
+
+def test_home_continue_button_follows_real_progress():
+    from datetime import date
+
+    from bankui.views import home
+    d = date(2026, 7, 1)
+    base = dict(through=None, rd=None, done={"silver_merge": 0, "silver_transform": 0, "gold": 0}, ready=0, n_reports=18)
+    assert home._next_step(base)[:2] == ("Start with Ingestion", "ingestion")
+    assert home._next_step(dict(base, through=d, rd=d))[:2] == ("Continue to Transformation", "transformation")
+    half = dict(base, through=d, rd=d, done={"silver_merge": 23, "silver_transform": 52, "gold": 3})
+    assert home._next_step(half)[:2] == ("Continue to Transformation", "transformation")
+    full = dict(half, ready=5)
+    label, page, why = home._next_step(full)
+    assert (label, page) == ("Open Reporting", "reporting") and "5 of 18 reports" in why
