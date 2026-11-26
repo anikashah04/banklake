@@ -44,3 +44,40 @@ def quarantine_counts(entity):
             reason = f"NULL_{entity.upper()}_ID" if reason == "NULL_PRIMARY_KEY" else reason
             counts[reason] = counts.get(reason, 0) + n
     return counts
+
+
+RD = "2026-11-25"
+
+
+@pytest.fixture(scope="session")
+def bronze_all(lake):
+    """The 17 source-only Bronze tables come from a real small ingestion run in its own home (so the shared core Bronze is untouched)."""
+    import shutil
+    import subprocess
+
+    from banklake.common import LAKE
+    from banklake.schemas import SOURCE_ONLY
+    home = tempfile.mkdtemp(prefix="banklake_ing_")
+    code = ("from datetime import date\nfrom banklake import meta, sources, ingest\nmeta.init_db(); sources.ensure_sources()\n"
+            "assert ingest.run(date(2026, 7, 1))['status'] == 'SUCCESS'")
+    env = {**os.environ, "BANKLAKE_HOME": home, "BANKLAKE_SOURCE_SCALE": "small", "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=900)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-1500:]
+    for e in SOURCE_ONLY:
+        shutil.copytree(Path(home) / "data" / "lake" / "bronze" / e, LAKE / "bronze" / e, dirs_exist_ok=True)
+    return True
+
+
+@pytest.fixture(scope="module")
+def loaded(request, lake, bronze_all):
+    """Run every procedure of the three layers for one report date, in pipeline order."""
+    from banklake import meta
+    from banklake.transform import catalog, engine
+    meta.init_db()
+    res = {}
+    for layer in catalog.LAYERS:
+        for p in catalog.procs_for(layer):
+            res[p["proc_id"]] = engine.run_proc(p["proc_id"], RD, getattr(request.module, "ORDER", "ORD-TEST-1"))
+    return res
+
+

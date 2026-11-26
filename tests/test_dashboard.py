@@ -79,7 +79,7 @@ assert not bad
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
 
-SLOW = ("start ingestion", "run", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset", "refresh")
+SLOW = ("start ingestion", "load all", "convert", "run", "view details", "sql migration", "bi dashboards", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset", "refresh")
 
 
 def test_every_safe_button_on_every_page_does_something(lake):

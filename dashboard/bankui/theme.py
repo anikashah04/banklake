@@ -7,7 +7,7 @@ STATUS = {  # status -> (text colour, background)
     "FAILED": ("#A3302A", "#F8E4E2"), "FAIL": ("#A3302A", "#F8E4E2"), "HIGH": ("#A3302A", "#F8E4E2"),
     "RUNNING": ("#2F5D8A", "#E3ECF5"), "BLOCKED": ("#8A5A12", "#FBF0DC"), "MEDIUM": ("#8A5A12", "#FBF0DC"), "WARNING": ("#8A5A12", "#FBF0DC"),
     "SKIPPED": ("#5E6B7D", "#ECEFF3"), "NOT RUN": ("#5E6B7D", "#ECEFF3"), "LOW": ("#5E6B7D", "#ECEFF3"), "INFO": ("#2F5D8A", "#E3ECF5"),
-    "COMPLETED": ("#1E6B49", "#E3F1EA"), "WARNINGS": ("#8A5A12", "#FBF0DC"), "NOT STARTED": ("#5E6B7D", "#ECEFF3"),
+    "COMPLETED": ("#1E6B49", "#E3F1EA"), "READY": ("#1E6B49", "#E3F1EA"), "NOT READY": ("#5E6B7D", "#ECEFF3"), "WARNINGS": ("#8A5A12", "#FBF0DC"), "NOT STARTED": ("#5E6B7D", "#ECEFF3"),
     "NOT CONFIGURED": ("#5E6B7D", "#ECEFF3"), "PLANNED": ("#5E6B7D", "#ECEFF3"), "UNAVAILABLE": ("#5E6B7D", "#ECEFF3"),
     "NOT ENABLED": ("#5E6B7D", "#ECEFF3"), "NO DATA": ("#5E6B7D", "#ECEFF3"),
 }

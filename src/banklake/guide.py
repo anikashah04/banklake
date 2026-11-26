@@ -43,24 +43,24 @@ QUICK_START = [
     ("Open the console", "Run `streamlit run dashboard/app.py` in the project folder. It opens in your browser at http://localhost:8501."),
     ("Build the data", "On the first page press **Build the demo**. It creates fictional Finacle-style source files and runs every pipeline from Bronze to Gold (about two minutes)."),
     ("Read the pipeline", "The **ETL Pipeline** page shows Source, then 1 Ingestion (Bronze), 2 Transformation (Silver Merge, Silver Transform, Gold) and 3 Reporting (BI), with live row counts. Bronze and Silver are masked; Gold and BI are unmasked."),
-    ("Open each part", "Use the buttons under the diagram: **1 Ingestion** has the Start Ingestion button for the three source systems, **2 Transformation** shows each step and the Teradata to Athena and EMR conversion, **3 Reporting and BI** shows the Gold tables and the dashboards."),
+    ("Open each part", "Use the buttons under the diagram: **1 Ingestion** has the Start Ingestion button for the three source systems, **2 Transformation** shows the whole pipeline: pick Silver or Gold, search for a transformation (named after its target table) and press Run (View Details shows the Teradata, Athena and EMR code), **3 Reporting and BI** shows the Gold tables and the dashboards."),
     ("Validate", "Open **Validation** and press **Run validation now** to compare record counts between the source and each layer."),
 ]
 
 DEMO_SCRIPT = [
     ("0:00 The pipeline", "ETL Pipeline page: follow Source, Bronze, Silver Merge, Silver Transform, Gold, BI. Say which layers are masked and which are not."),
     ("1:00 Ingestion", "Open 1 Ingestion, pick a business date and press Start Ingestion: the arrows turn amber while a stage runs and green when it finishes. Click a table to see its masked Bronze records."),
-    ("2:00 Transformation", "Open 2 Transformation: Silver Merge, Silver Transform (set-aside rows with reasons), then Gold and which Silver tables build each Gold table."),
+    ("2:00 Transformation", "Open 2 Transformation: pick Silver or Gold, choose a transformation, press Run and watch the pipeline colours; open View Details for the code, target data and audit log."),
     ("3:00 Teradata to Athena", "Same page, last tab: load the example procedure, show the Athena SQL and the generated EMR script."),
-    ("4:00 Reporting", "Open 3 Reporting and BI: the Gold tables and the executive dashboards."),
+    ("4:00 Reporting", "Open 3 Reporting and BI: the 18 reports in four kinds (Dashboard: key numbers and four charts; Report: table with totals plus a chart; Regulatory: fixed-format return that reconciles to Gold; BI: pick your own chart from 17 types) for any report date, export CSV; View Details shows lineage, SQL, data quality and audit log; the original BI dashboards sit behind their own button."),
     ("4:30 Validation", "Open Validation: source versus Bronze, Silver and Gold counts, then run the checks."),
 ]
 
 PAGE_PURPOSE = [
     ("ETL Pipeline", "The whole flow on one diagram, with live row counts and which layers are masked.", "Everyone"),
     ("1 Ingestion", "The three source systems, which tables are due on a business date (daily, monthly, quarterly), and the Bronze transformations (TRIM, UPPER, AES masking).", "Data engineers"),
-    ("2 Transformation", "Silver Merge, Silver Transform and Gold, plus the Teradata to Athena conversion and EMR script.", "Data engineers, migration teams"),
-    ("3 Reporting and BI", "The Gold tables and the executive dashboards built from them.", "Analysts, managers"),
+    ("2 Transformation", "Teradata SELECT procedures converted to Athena SELECTs and EMR PySpark scripts that load the tables, with a layer audit log.", "Data engineers, migration teams"),
+    ("3 Reporting and BI", "The 18 reports in four kinds (Dashboard: key numbers and four charts; Report: table with totals plus a chart; Regulatory: fixed-format return that reconciles to Gold; BI: pick your own chart from 17 types) for any report date, export CSV; View Details shows lineage, SQL, data quality and audit log; the original BI dashboards sit behind their own button built from them.", "Analysts, managers"),
     ("Validation", "Do record counts match between the source and each layer, and can every difference be explained?", "Data owners, auditors"),
 ]
 

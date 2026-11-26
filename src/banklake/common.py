@@ -40,6 +40,8 @@ def get_spark():
             .config("spark.ui.enabled", "false")
             .config("spark.sql.session.timeZone", "UTC")
             .config("spark.driver.memory", "2g")
+            # 66 different SQL plans in one session fill the JVM's default 128 MB code cache; when it is full the JIT compiler switches off and Spark slows down
+            .config("spark.driver.extraJavaOptions", "-XX:ReservedCodeCacheSize=512m -XX:+UseCodeCacheFlushing")
             .getOrCreate()
         )
         _spark.sparkContext.setLogLevel("ERROR")

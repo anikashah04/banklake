@@ -384,61 +384,14 @@ def _steps(c):
 
 
 def transformation():
-    st.markdown("### 2  Transformation: Bronze to Silver to Gold")
-    if not _has_data():
-        _none()
-        return
-    c = counts()
-    t1, t2, t3, t4 = st.tabs(["Silver Merge", "Silver Transform", "Gold", "Teradata → Athena → EMR"])
-    steps = pd.DataFrame(_steps(c))
-    with t1:
-        st.caption("Reads Bronze and applies new, changed and deleted records, so there is one current row per key. Still masked.")
-        table(steps[steps.step == "Silver Merge"].drop(columns="step"))
-        e = st.selectbox("Preview", ORDER, key="sm_preview")
-        if helpers.has("silver_merge", e):
-            table(helpers.sample("silver_merge", e, 100))
-    with t2:
-        st.caption("Cleans values, checks business rules and joins tables. Rows that fail a rule go to quarantine with the reason. Still masked.")
-        table(steps[steps.step == "Silver Transform"].drop(columns="step"))
-        e = st.selectbox("Preview", ORDER, key="st_preview")
-        if helpers.has("silver", e):
-            table(helpers.sample("silver", e, 100))
-        if helpers.has("quarantine", f"silver_{e}"):
-            st.markdown(f"**Set aside from {e}**")
-            table(helpers.Q(f"SELECT reject_reason, count(*) AS rows FROM {helpers.pq('quarantine', 'silver_' + e)} GROUP BY 1 ORDER BY 2 DESC"))
-    with t3:
-        st.caption("Gold tables are built from the Silver tables and are the first unmasked layer: customer_360 gets its real names, emails and phones back from the vault (audited).")
-        lin = table_lineage()
-        table(pd.DataFrame([{"Gold table": g, "rows": c["gold"].get(g), "built from Silver": ", ".join(lin.get(g, []))} for g in GOLD_LINEAGE]))
-        g = st.selectbox("Preview a Gold table", list(GOLD_LINEAGE), key="gd_preview")
-        if helpers.has("gold", g):
-            table(helpers.sample("gold", g, 100))
-    with t4:
-        st.caption("The on-premise Teradata procedures were converted to Athena SQL, and EMR (PySpark) scripts were created to load the Gold tables.")
-        from . import procs
-        procs.render()
-        with st.expander("Convert a single query instead"):
-            from .. import legacy
-            legacy.render("SQL migration", helpers.current_role())
+    from . import transform
+    transform.page()
 
 
 # ---------------------------------------------------------------- 4. reporting
 def reporting():
-    st.markdown("### 3  Reporting: Gold tables and BI")
-    if not _has_data():
-        _none()
-        return
-    c = counts()
-    t1, t2 = st.tabs(["Gold tables", "BI reports"])
-    with t1:
-        st.caption("Reporting reads only Gold. Gold holds unmasked (synthetic) customer details, so these tables stay on this machine.")
-        table(pd.DataFrame([{"Gold table": g, "rows": c["gold"].get(g), "grain": GOLD_LINEAGE[g][0]} for g in GOLD_LINEAGE]))
-        g = st.selectbox("Open a Gold table", list(GOLD_LINEAGE), key="rp_gold")
-        if helpers.has("gold", g):
-            table(helpers.sample("gold", g, 200))
-    with t2:
-        from .. import legacy
-        legacy.render("BI dashboards", helpers.current_role())
+    from . import report
+    report.page()
 
 
 # ---------------------------------------------------------------- 5. validation

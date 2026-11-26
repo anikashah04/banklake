@@ -187,6 +187,8 @@ def init_db() -> None:
         c.execute("INSERT OR IGNORE INTO masking_metadata VALUES(?,?,?,?)", (ent, col, rule, "Y"))
     for role, ent, col in UNMASK:
         c.execute("INSERT OR IGNORE INTO role_permissions VALUES(?,?,?)", (role, ent, col))
+    from .transform import catalog as _procs   # procedure metadata (Teradata -> Athena -> EMR), layer audit log
+    _procs.ensure(c)
     c.commit()
     c.close()
 

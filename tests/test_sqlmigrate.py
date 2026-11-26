@@ -197,3 +197,11 @@ def test_comparator_catches_a_wrong_conversion(lake):
     df, keys = REFERENCES["legacy_branch_segment_summary"](get_spark())
     c = compare(got, _rows(df), key_idx=keys)
     assert c["match"] is False and (c["mismatch_count"] > 0 or not c["row_count_match"])
+
+
+def test_extract_from_is_not_mistaken_for_a_table():
+    """EXTRACT(YEAR FROM d.col) / SUBSTRING(x FROM 2) / TRIM(BOTH ' ' FROM x): the FROM inside the brackets is not a table list."""
+    from banklake.sqlmigrate.converter import convert
+    c = convert("SEL EXTRACT(YEAR FROM t.opened) y, TRIM(BOTH ' ' FROM t.n) n FROM banking.account_master t")
+    assert "EXTRACT(YEAR FROM t.opened)" in c.converted and "t_opened" not in c.converted
+    assert "banklake.silver_account" in c.converted
