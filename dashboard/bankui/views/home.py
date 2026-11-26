@@ -27,7 +27,7 @@ def _facts():
     ready = 0
     if rd_s:
         for info in report.reports().values():
-            ready += all(report.table_state(t, rd_s)[0] == "done" for t in info["tables"])
+            ready += all((lambda st_: st_[0] == "done" and st_[1])(report.table_state(t, rd_s)) for t in info["tables"])   # loaded and not empty
     val = meta.query("SELECT run_id FROM reconciliation_results ORDER BY id DESC LIMIT 1")
     return dict(run=run[0] if run else None, through=through, rd=rd, done=done, ready=ready, validated=bool(val),
                 total={k: sum(1 for p in catalog.PROCS if p["layer"] == k) for k in done}, n_reports=len(report.reports()))

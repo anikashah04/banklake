@@ -372,8 +372,10 @@ def page():
     c1, c2, c3, c4 = st.columns([1.1, 3.0, 1.3, 1.0], vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Report date", "rp_date")
-    name = c2.selectbox(f"Report  ({len(cat)})", list(cat), format_func=lambda n: f"{n}   ·   {cat[n]['type']}", key="rp_report")
-    rd, info = bd.isoformat(), cat[name]
+    rd = bd.isoformat()
+    nodata = {n for n, v in cat.items() if any(table_state(t, rd)[1] == 0 for t in v["tables"])}
+    name = c2.selectbox(f"Report  ({len(cat)})", list(cat), format_func=lambda n: f"{n}   ·   {cat[n]['type']}" + ("   ·   no data" if n in nodata else ""), key="rp_report")
+    info = cat[name]
     states = {t: table_state(t, rd) for t in info["tables"]}
     ready = all(s == "done" for s, _ in states.values())
     stale = flow.ingested_through() is None or bd > flow.ingested_through()
@@ -397,7 +399,8 @@ def page():
         a.markdown(f"<div style='font-weight:800;font-size:1.15rem;color:{INK}'>{esc(name)}</div>"
                    f"<div style='color:{MUTE};font-size:.88rem'>{esc(info['type'])} · {esc(TYPE_NOTE[info['type']])}<br>Built from "
                    + ", ".join(f"<code>{esc(t)}</code>" for t in info["tables"]) + "</div>", unsafe_allow_html=True)
-        b.markdown(f"<div style='text-align:right'>{badge('READY' if ready else 'FAILED' if failed else 'NOT READY')}</div>", unsafe_allow_html=True)
+        empties = [t for t, (s_, n_) in states.items() if s_ == "done" and n_ == 0]
+        b.markdown(f"<div style='text-align:right'>{badge('NO DATA' if ready and empties else 'READY' if ready else 'FAILED' if failed else 'NOT READY')}</div>", unsafe_allow_html=True)
     if busy:
         _progress()
         return
@@ -414,8 +417,17 @@ def page():
     if not ready:
         st.info("This report has not been loaded for this date. Press Load Report Data.")
         return
-    frames = _frames(info["tables"], rd)
-    if all(f.empty for f in frames.values()):
-        st.info("This report has no rows for this date. Bronze may not hold data this early; try a later date.")
+    if empties:
+        st.warning(f"No rows in {', '.join(empties)} for {bd:%d %b %Y}, so there is nothing to show. Bronze only holds the records of the days that were loaded one at a time. "
+                   "Load everything up to this date with Run Entire Pipeline on Home, or Load History on Ingestion.")
+        a_, b_, _ = st.columns([1.2, 1.2, 3])
+        with a_:
+            flow.go("Go to Home", "home", "rp_empty_home", primary=True)
+        with b_:
+            flow.go("Open Ingestion", "ingestion", "rp_empty_ing")
         return
+    thin = [t for t, (s_, n_) in states.items() if n_ == 1]
+    if thin:
+        st.info(f"Only 1 row in {', '.join(thin)}. Bronze holds a single day for this table, so the figures are tiny. Run Entire Pipeline on Home for the full picture.")
+    frames = _frames(info["tables"], rd)
     LAYOUT[info["type"]](SPECS[name], frames, name, rd)

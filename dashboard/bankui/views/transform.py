@@ -147,7 +147,8 @@ def _status(p, rd, run):
         return last[0]["status"], (last[0]["error_message"] or "")[:160]
     ld = engine.loaded(p["target"], p["layer"], rd)
     if ld:
-        return "COMPLETED", f"{ld['output_count']:,} rows loaded"
+        n = ld["output_count"]
+        return "COMPLETED", f"{n:,} rows loaded" if n else "0 rows loaded. Bronze has no matching records for this date; use Load History"
     return "NOT RUN", "Nothing loaded for this report date yet"
 
 

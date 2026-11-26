@@ -73,3 +73,36 @@ assert "Silver, Gold and every report are ready" in text, text[-500:]
 print("OK")
 """ % str(ROOT / "dashboard" / "app.py"), tmp_path)
     assert "OK" in out
+
+
+def test_reports_built_from_a_single_day_explain_that_they_are_empty_instead_of_showing_blanks(tmp_path):
+    out = _run("""
+import time
+from datetime import date
+from streamlit.testing.v1 import AppTest
+from banklake import meta, ingest
+from banklake.transform import engine
+meta.init_db()
+assert ingest.run(date(2026, 7, 1))["status"] == "SUCCESS"            # one day only: the core tables hold a handful of rows
+engine.start("gold", "2026-07-01", None)
+while engine.running(): time.sleep(0.5)
+at = AppTest.from_file(%r, default_timeout=180).run()
+pages = {(i['url_pathname'] or 'home'): h for h, i in at._registered_pages.items() if 'url_pathname' in i}
+at._page_hash = pages['reporting']; at.run()
+assert not at.exception, [e.value for e in at.exception]
+sel = [s for s in at.selectbox if s.label.startswith('Report')][0]
+assert any('no data' in o for o in sel.options), sel.options[:3]
+def show(name):
+    s = [x for x in at.selectbox if x.label.startswith('Report')][0]
+    s.select([o for o in s.options if o.startswith(name)][0]).run()
+    assert not at.exception, (name, [e.value for e in at.exception])
+    return " ".join(w.value for w in at.warning) + " ".join(i.value for i in at.info)
+text = show('Customer Overview Dashboard')
+assert 'No rows in gold_customer_overview' in text and 'Run Entire Pipeline' in text, text
+assert {b.label for b in at.button} >= {'Go to Home', 'Open Ingestion'}
+text = show('Fraud Monitoring Dashboard')
+assert 'Only 1 row' in text, text
+show('Executive Summary')       # mixes empty and filled tables: explains, never crashes
+print("OK")
+""" % str(ROOT / "dashboard" / "app.py"), tmp_path)
+    assert "OK" in out
