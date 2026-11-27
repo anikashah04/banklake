@@ -140,7 +140,7 @@ at._page_hash = pages['ingestion']; at.run()
 assert not at.exception
 assert not [b for b in at.button if b.label == 'Start Ingestion'][0].disabled
 assert at.date_input[0].max == datetime.date.today() - datetime.timedelta(days=1), at.date_input[0].max
-assert any('Load History' in c.value for c in at.caption)           # first-time hint on a fresh lake
+assert any(b.label == 'Load History' for b in at.button)
 """
     env = {**os.environ, "BANKLAKE_HOME": str(tmp_path)}
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=900)

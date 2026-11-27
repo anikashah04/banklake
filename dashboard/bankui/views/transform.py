@@ -11,10 +11,9 @@ from banklake.common import layer_path
 from banklake.transform import catalog, engine
 
 from ..components import badge, table
-from .etl import ARROW, INK, LINE, MUTE, STATE_WORD, esc
+from .etl import ARROW, INK, LINE, STATE_WORD, esc
 
 TITLE = catalog.LAYER_TITLE
-SUB = {"silver_merge": "newest record per key", "silver_transform": "clean, check, summarise", "gold": "report tables"}
 FLOW = ("silver_merge", "silver_transform", "gold")
 BAD = ("FAILED", "BLOCKED")
 
@@ -77,7 +76,7 @@ def _svg(pid, rd, run):
     path = _path(pid)
     bronze = sorted({s for p in path if p["source_db"] == "bronze" for s in p["sources"]})
     b_ok = all(any(layer_path("bronze", t).glob("*.parquet")) for t in bronze)
-    o = ['<svg viewBox="0 0 1240 236" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" text-rendering="geometricPrecision"><defs>']
+    o = ['<svg viewBox="0 0 1240 188" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" text-rendering="geometricPrecision"><defs>']
     for k, col in ARROW.items():
         o.append(f'<marker id="p_{k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
                  f'<path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
@@ -88,48 +87,39 @@ def _svg(pid, rd, run):
                  if state == "processing" else (' stroke-dasharray="3 4"></path>' if state == "idle" else "></path>"))
         o.append(f'<path d="M{x1},{y} L{x2},{y}" fill="none" stroke="{ARROW[state]}" stroke-width="{w}" marker-end="url(#p_{state})"{extra}')
 
-    # Bronze
-    o.append(f'<rect x="8" y="24" width="108" height="166" rx="10" fill="#FFFFFF" stroke="{ARROW["done"] if b_ok else ARROW["failed"]}" stroke-width="1.8"/>')
-    o.append('<text x="22" y="52" font-size="12" font-weight="700" letter-spacing=".08em" fill="#374151">BRONZE</text>')
-    o.append(f'<text x="22" y="80" font-size="22" font-weight="800" fill="{INK}">{len(bronze)}</text>')
-    o.append(f'<text x="22" y="98" font-size="12" fill="#374151">table{"s" if len(bronze) != 1 else ""} read</text>')
-    o.append(f'<text x="22" y="130" font-size="11" fill="{MUTE}">PII masked</text><text x="22" y="145" font-size="11" fill="{MUTE}">here only</text>')
+    # Bronze: a compact source card
+    bc = ARROW["done"] if b_ok else ARROW["failed"]
+    o.append(f'<rect x="8" y="24" width="108" height="140" rx="6" fill="#FFFFFF" stroke="{bc}" stroke-width="1.2"/>')
+    o.append('<text x="22" y="50" font-size="11.5" font-weight="700" letter-spacing=".08em" fill="#475569">BRONZE</text>')
+    o.append(f'<text x="22" y="92" font-size="26" font-weight="700" fill="{INK}">{len(bronze)}</text>')
+    o.append(f'<text x="22" y="112" font-size="12" fill="#475569">table{"s" if len(bronze) != 1 else ""}</text>')
     gx = [134, 506, 878]
     first_on = FLOW[0] in st_ or FLOW[1] in st_
-    arrow(116, 134, 112, "done" if b_ok and first_on else "idle")
+    arrow(116, 134, 94, "done" if b_ok and first_on else "idle")
     labels = [("td", "Teradata", "SELECT"), ("at", "Athena", "SELECT"), ("em", "EMR", "PySpark"), ("tg", "Target", "table")]
     for gi, layer in enumerate(FLOW):
         x0, on = gx[gi], layer in st_
         s = st_.get(layer)
-        o.append(f'<g opacity="{1 if on else .55}">')
-        fill = "#EEF5F1" if layer == "gold" else "#F4F6F9"
-        o.append(f'<rect x="{x0}" y="24" width="352" height="166" rx="12" fill="{fill}" stroke="{INK if on else LINE}" stroke-width="{1.8 if on else 1}"/>')
-        o.append(f'<text x="{x0 + 14}" y="48" font-size="12.5" font-weight="800" letter-spacing=".08em" fill="{INK}">{TITLE[layer].upper()}</text>')
-        sub = SUB[layer] if not (on and s["n"] > 1) else f"{s['n']} tables in this path"
-        o.append(f'<text x="{x0 + 14}" y="65" font-size="11.5" fill="{MUTE}">{esc(sub)}</text>')
+        o.append(f'<g opacity="{1 if on else .45}">')
+        o.append(f'<rect x="{x0}" y="24" width="352" height="140" rx="6" fill="#F5F7FA" stroke="{LINE}" stroke-width="1"/>')
+        o.append(f'<text x="{x0 + 14}" y="48" font-size="12" font-weight="700" letter-spacing=".08em" fill="{INK}">{TITLE[layer].upper()}</text>')
         for k, (key, a, b) in enumerate(labels):
             nx = x0 + 6 + k * 90
             state = s[key] if on else "idle"
             col = ARROW[state]
-            o.append(f'<rect x="{nx}" y="84" width="70" height="56" rx="8" fill="#FFFFFF" stroke="{col}" stroke-width="2"{"" if on else " stroke-dasharray=\"3 4\""}/>')
-            o.append(f'<text x="{nx + 35}" y="108" text-anchor="middle" font-size="12.5" font-weight="700" fill="{INK}">{a}</text>')
-            o.append(f'<text x="{nx + 35}" y="125" text-anchor="middle" font-size="11.5" fill="#374151">{b}</text>')
+            o.append(f'<rect x="{nx}" y="64" width="70" height="56" rx="4" fill="#FFFFFF" stroke="{col}" stroke-width="1.2"/>')
+            o.append(f'<text x="{nx + 35}" y="88" text-anchor="middle" font-size="12.5" font-weight="650" fill="{INK}">{a}</text>')
+            o.append(f'<text x="{nx + 35}" y="105" text-anchor="middle" font-size="11.5" fill="#475569">{b}</text>')
             if on:
-                o.append(f'<text x="{nx + 35}" y="158" text-anchor="middle" font-size="11" font-weight="600" fill="{col}">{STATE_WORD[state]}</text>')
-                if key == "tg" and s["n"] > 1:
-                    o.append(f'<text x="{nx + 35}" y="174" text-anchor="middle" font-size="11" fill="{MUTE}">{s["done"]} of {s["n"]}</text>')
+                lab = STATE_WORD[state] + (f" {s['done']}/{s['n']}" if key == "tg" and s["n"] > 1 else "")
+                o.append(f'<text x="{nx + 35}" y="140" text-anchor="middle" font-size="11" font-weight="600" fill="{col}">{lab}</text>')
             if k:
-                arrow(nx - 20, nx, 112, state)
+                arrow(nx - 20, nx, 92, state)
         o.append("</g>")
         if gi:
             prev = FLOW[gi - 1]
             both = prev in st_ and on
-            arrow(x0 - 20, x0, 112, st_[prev]["tg"] if both else "idle", 3)
-    x = 134
-    for k in ("waiting", "processing", "done", "failed"):
-        o.append(f'<line x1="{x}" y1="216" x2="{x + 24}" y2="216" stroke="{ARROW[k]}" stroke-width="3"/>')
-        o.append(f'<text x="{x + 32}" y="220" font-size="13" font-weight="500" fill="#374151">{STATE_WORD[k]}</text>')
-        x += 124
+            arrow(x0 - 20, x0, 94, st_[prev]["tg"] if both else "idle", 2.5)
     o.append("</svg>")
     return "".join(o)
 
@@ -155,20 +145,18 @@ def _status(p, rd, run):
 def _summary(pid, rd, run):
     p = catalog.BY_ID[pid]
     status, detail = _status(p, rd, run)
-    with st.container(border=True):
-        c1, c2 = st.columns([4, 1.3], vertical_alignment="center")
-        c1.markdown(f"<div style='font-weight:800;font-size:1.15rem;color:{INK}'>{esc(p['target'])}</div>"
-                    f"<div style='color:{MUTE};font-size:.88rem'>{esc(TITLE[p['layer']])} · {esc(p['desc'])}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div style='text-align:right'>{badge(status)}</div><div style='text-align:right;color:{MUTE};font-size:.8rem'>{esc(detail)}</div>",
-                    unsafe_allow_html=True)
-        a, b = st.columns(2)
-        a.markdown(f"<span style='color:{MUTE};font-size:.8rem'>{'FED BY SILVER TABLES' if p['layer'] == 'gold' else 'SOURCE TABLES'}</span><br>"
-                   + ", ".join(f"`{p['source_db']}.{s}`" for s in p["sources"]), unsafe_allow_html=True)
-        b.markdown(f"<span style='color:{MUTE};font-size:.8rem'>TARGET TABLE</span><br>`{p['layer']}.{p['target']}`", unsafe_allow_html=True)
-        if p["layer"] == "gold":
-            rep = meta.query("SELECT group_concat(report_name, ', ') AS r FROM gold_report_usage WHERE target_table = ?", (p["target"],))
-            if rep and rep[0]["r"]:
-                st.markdown(f"<span style='color:{MUTE};font-size:.8rem'>USED IN REPORTS</span><br>{esc(rep[0]['r'])}", unsafe_allow_html=True)
+    ld = engine.loaded(p["target"], p["layer"], rd)
+    rows = f"{ld['output_count']:,}" if ld and status == "COMPLETED" else "-"
+    k = lambda t: f"<div class='bl-k'>{t}</div>"  # noqa: E731
+    with st.container(border=True, key="tr_card"):
+        c = st.columns([2.2, 3.2, 2.4, 1.1, 1.1], vertical_alignment="center")
+        c[0].markdown(k("Transformation") + f"<div class='bl-v b'>{esc(p['target'])}</div>", unsafe_allow_html=True)
+        c[1].markdown(k("Source Table") + "<div class='bl-v'>" + ", ".join(f"{esc(p['source_db'])}.{esc(s_)}" for s_ in p["sources"]) + "</div>", unsafe_allow_html=True)
+        c[2].markdown(k("Target Table") + f"<div class='bl-v'>{esc(p['layer'])}.{esc(p['target'])}</div>", unsafe_allow_html=True)
+        c[3].markdown(k("Rows Loaded") + f"<div class='bl-v num'>{rows}</div>", unsafe_allow_html=True)
+        c[4].markdown(f"<div style='text-align:right'>{badge(status)}</div>", unsafe_allow_html=True)
+        if status in BAD and detail:
+            st.markdown(f"<div class='bl-err'>{esc(detail)}</div>", unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------------ details, loaded only when requested
@@ -225,18 +213,6 @@ def _details(pid, rd):
             st.caption("No audit rows for this table yet.")
 
 
-@st.dialog("SQL Migration Tool", width="large")
-def _migration():
-    from .. import helpers, legacy
-    from . import procs
-    st.caption("Convert any Teradata query or stored procedure on its own. This does not run anything on the lake.")
-    a, b = st.tabs(["Stored procedure", "Single query"])
-    with a:
-        procs.render()
-    with b:
-        legacy.render("SQL migration", helpers.current_role())
-
-
 # ------------------------------------------------------------------ page
 
 def _view(pid, rd):
@@ -281,7 +257,7 @@ def page():
         if run["report_date"] != str(st.session_state.get(flow.KEY)):
             st.session_state[flow.KEY] = date.fromisoformat(run["report_date"])
             st.session_state.pop("tr_date", None)
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1.1, 1.0, 2.4, 0.6, 0.8, 0.9, 1.3], vertical_alignment="bottom")
+    c1, c2, c3, _gap, c4, c5, c6 = st.columns([1.1, 1.0, 2.4, 0.9, 0.6, 0.8, 1.0], vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Report date", "tr_date")
     group = c2.segmented_control("Layer", list(catalog.GROUPS), default="Silver", key="tr_group", disabled=busy) or "Silver"
@@ -296,7 +272,6 @@ def page():
     run_b = c4.button("Run", type="primary", width="stretch", disabled=block, key="tr_run")
     all_b = c5.button("Run All", width="stretch", disabled=block, key="tr_all", help=f"Load every {group} table for this date")
     det_b = c6.button("View Details", width="stretch", key="tr_details")
-    mig_b = c7.button("SQL Migration Tool", width="stretch", key="tr_mig")
     if stale:
         flow.not_ingested(bd)
     elif ingest.running():
@@ -314,8 +289,6 @@ def page():
         st.rerun()
     if det_b:
         _details(pid, rd)
-    if mig_b:
-        _migration()
     if busy:
         _live_fragment(pid, rd)
         return

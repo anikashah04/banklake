@@ -11,7 +11,7 @@ from banklake.transform import catalog, engine
 from ..components import badge, table
 from . import charts
 from .etl import ARROW, INK, MUTE, esc
-from .report_specs import SPECS, TYPE_NOTE
+from .report_specs import SPECS
 
 BAD = ("FAILED", "BLOCKED")
 SKIP = {"report_date", "run_id", "business_date", "processed_date", "last_upd_date", "source_name"}
@@ -118,7 +118,6 @@ def _details(name, info, rd):
                          "Loaded at": ld["timestamp"] if ld else None})
         table(pd.DataFrame(rows), height=min(38 + 35 * len(rows), 300))
     with t[1]:
-        st.caption("Where each Gold table comes from: Gold reads Silver Transform, which reads Silver Merge, which reads Bronze.")
         rows = []
         for g in tabs:
             pid = f"gold.{g}"
@@ -134,7 +133,6 @@ def _details(name, info, rd):
             else:
                 st.caption("Not converted yet. Open the Transformation page and run it.")
     with t[3]:
-        st.caption("The numbers behind the charts, as they sit in the Gold tables.")
         for g in tabs:
             st.markdown(f"`{g}`")
             df = frame(g, rd, 500)
@@ -260,7 +258,6 @@ def _regulatory(sp, frames, name, rd):
     with st.container(border=True):
         _plot(sp["panels"][0], frames, f"pl_{name}_0")
     st.markdown("**Return table**")
-    st.caption("Fixed format. Every figure is read from the Gold table named below and the table is never edited here.")
     table(shown, height=min(35 * (min(len(shown), 12) + 1) + 3, 460))
     ok = ld is not None and ld["output_count"] == len(df)
     st.markdown(f"{badge('PASS' if ok else 'FAIL')}&nbsp; Rows in this return ({len(df):,}) "
@@ -335,7 +332,7 @@ def _bi(sp, frames, name, rd):
         ch = charts.build(kind, df, how=how, top=12 if kind in TOP_KINDS else None, **pick)
         if ch is not None:
             charts.render(ch, f"bi_chart_{name}_{t}_{kind}")
-    st.caption(f"{len(df):,} rows in {t}. Pick another chart type to see the same numbers a different way.")
+    st.caption(f"{len(df):,} rows in {t}")
     st.download_button("Export CSV", df.drop(columns=[c for c in SKIP if c in df.columns]).to_csv(index=False), f"{t}_{rd}.csv", "text/csv", key=f"rp_csv_{name}")
 
 
@@ -397,7 +394,7 @@ def page():
     with st.container(border=True):
         a, b = st.columns([4, 1.4], vertical_alignment="center")
         a.markdown(f"<div style='font-weight:800;font-size:1.15rem;color:{INK}'>{esc(name)}</div>"
-                   f"<div style='color:{MUTE};font-size:.88rem'>{esc(info['type'])} · {esc(TYPE_NOTE[info['type']])}<br>Built from "
+                   f"<div style='color:{MUTE};font-size:.85rem'>{esc(info['type'])} · "
                    + ", ".join(f"<code>{esc(t)}</code>" for t in info["tables"]) + "</div>", unsafe_allow_html=True)
         empties = [t for t, (s_, n_) in states.items() if s_ == "done" and n_ == 0]
         b.markdown(f"<div style='text-align:right'>{badge('NO DATA' if ready and empties else 'READY' if ready else 'FAILED' if failed else 'NOT READY')}</div>", unsafe_allow_html=True)

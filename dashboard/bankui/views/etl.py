@@ -33,7 +33,6 @@ def counts():
     for e in ORDER:
         for layer, key in (("bronze", "bronze"), ("silver_merge", "silver_merge"), ("silver", "silver")):
             c[layer][e] = helpers.count(layer, e) if helpers.has(layer, e) else None
-            q = "quarantine/" + layer + "_" + e
             c["bad"][(layer, e)] = helpers.count("quarantine", f"{layer}_{e}") if helpers.has("quarantine", f"{layer}_{e}") else 0
     for g in GOLD_LINEAGE:
         c["gold"][g] = helpers.count("gold", g) if helpers.has("gold", g) else None
@@ -54,86 +53,62 @@ def _none():
 
 
 
-def _go(page_key, label, key):
-    from .. import nav
-    if st.button(label, key=key, width="stretch", type="primary"):
-        st.switch_page(nav.PAGES[page_key])
-
-
 # ---------------------------------------------------------------- 1. the pipeline
 def _svg(c):
     tot = lambda d: sum(v or 0 for v in d.values()) if d else 0  # noqa: E731
     src, br, mg, sv = tot(c["source"]), tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
-    gold_rows = tot(c["gold"])
     n_gold = sum(v is not None for v in c["gold"].values())
-    bad = lambda layer: sum(v for (l_, _), v in c["bad"].items() if l_ == layer)  # noqa: E731
-    W, H = 1240, 360
+    W, H = 1240, 324
     o = [f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter, Arial, sans-serif">',
          f'<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{MUTE}"/></marker></defs>']
 
     def group(x, w, title, color):
-        o.append(f'<rect x="{x}" y="14" width="{w}" height="330" rx="8" fill="none" stroke="{color}" stroke-width="1.4" stroke-dasharray="5 4"/>'
-                 f'<text x="{x + 16}" y="42" font-size="14" font-weight="600" fill="{color}" letter-spacing=".6">{title}</text>')
+        o.append(f'<rect x="{x}" y="14" width="{w}" height="296" rx="6" fill="#EEF2F6"/>'
+                 f'<text x="{x + 14}" y="38" font-size="11.5" font-weight="700" fill="#475569" letter-spacing=".1em">{title}</text>')
 
-    def box(x, y, w, h, title, sub, n, fill, tag=None, extra=None):
-        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{fill}"/>'
-                 f'<text x="{x + 14}" y="{y + 30}" font-size="17" font-weight="600" fill="#fff">{title}</text>'
-                 f'<text x="{x + 14}" y="{y + 50}" font-size="12.5" fill="#E6EAF0">{sub}</text>'
-                 f'<text x="{x + 14}" y="{y + h - 16}" font-size="16" font-weight="600" fill="#fff">{n}</text>')
+    def box(x, y, w, h, title, n, fill, tag=None):
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="5" fill="{fill}"/>'
+                 f'<text x="{x + 14}" y="{y + 30}" font-size="15" font-weight="650" fill="#fff">{title}</text>'
+                 f'<text x="{x + 14}" y="{y + 72}" font-size="19" font-weight="700" fill="#fff">{n}</text>')
         if tag:
             tw = 14 + 7.4 * len(tag)
-            o.append(f'<rect x="{x + 14}" y="{y + 62}" width="{tw}" height="22" rx="11" fill="#fff" fill-opacity=".2"/>'
-                     f'<text x="{x + 14 + tw / 2}" y="{y + 77}" font-size="11" font-weight="600" fill="#fff" text-anchor="middle" letter-spacing=".5">{tag}</text>')
-        if extra:
-            o.append(f'<text x="{x + 14}" y="{y + h - 40}" font-size="12" fill="#FFD9D4">{extra}</text>')
+            o.append(f'<rect x="{x + 14}" y="{y + h - 36}" width="{tw}" height="22" rx="3" fill="#fff" fill-opacity=".18"/>'
+                     f'<text x="{x + 14 + tw / 2}" y="{y + h - 21}" font-size="11" font-weight="600" fill="#fff" text-anchor="middle" letter-spacing=".5">{tag}</text>')
 
     def arrow(x1, x2, y):
         o.append(f'<line x1="{x1}" y1="{y}" x2="{x2 - 2}" y2="{y}" stroke="{MUTE}" stroke-width="1.8" marker-end="url(#ar)"/>')
 
-    f = lambda v: "-" if not v else f"{v:,} rows"  # noqa: E731
-    box(10, 100, 140, 160, "Source", "Finacle / Teradata", f(src), "#4B5563")
-    arrow(150, 180, 180)
+    f = lambda v: "-" if not v else f"{v:,}"  # noqa: E731
+    H = 130
+    box(10, 100, 140, H, "Source", f(src), "#475569")
+    arrow(150, 180, 165)
     group(180, 200, "1  INGESTION", NAVY)
-    box(194, 100, 172, 160, "Bronze", "loaded, PII masked", f(br), NAVY, "MASKED", f"{bad('bronze'):,} set aside" if bad("bronze") else None)
-    arrow(380, 410, 180)
+    box(194, 100, 172, H, "Bronze", f(br), NAVY, "MASKED")
+    arrow(380, 410, 165)
     group(410, 560, "2  TRANSFORMATION", NAVY)
-    box(424, 100, 160, 160, "Silver Merge", "changes applied", f(mg), NAVY, "MASKED")
-    arrow(584, 610, 180)
-    box(610, 100, 160, 160, "Silver Transform", "cleaned, validated", f(sv), NAVY, "MASKED", f"{bad('silver'):,} set aside" if bad("silver") else None)
-    arrow(770, 796, 180)
-    box(796, 100, 160, 160, "Gold", "business tables", f"{n_gold} tables", GREEN, "UNMASKED")
-    arrow(970, 1000, 180)
+    box(424, 100, 160, H, "Silver Merge", f(mg), NAVY, "MASKED")
+    arrow(584, 610, 165)
+    box(610, 100, 160, H, "Silver Transform", f(sv), NAVY, "MASKED")
+    arrow(770, 796, 165)
+    box(796, 100, 160, H, "Gold", f"{n_gold} tables", GREEN, "UNMASKED")
+    arrow(970, 1000, 165)
     group(1000, 230, "3  REPORTING", GREEN)
-    box(1014, 100, 202, 160, "BI reports", "dashboards for executives", f"reads {n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
-    o.append(f'<text x="280" y="304" font-size="12.5" fill="{MUTE}" text-anchor="middle">PII → masked value + token</text>')
-    o.append(f'<text x="690" y="304" font-size="12.5" fill="{MUTE}" text-anchor="middle">source tables → Silver tables → Gold tables</text>')
-    o.append(f'<text x="1115" y="304" font-size="12.5" fill="{MUTE}" text-anchor="middle">real values read back from the vault</text>')
+    box(1014, 100, 202, H, "BI reports", f"{n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
     o.append("</svg>")
     return "".join(o)
 
 
 def home():
-    st.markdown("### Banking ETL pipeline")
-    st.caption("Finacle (Teradata) data comes in, is masked at Bronze, is transformed through Silver into Gold, and is reported in BI. Synthetic data only.")
     if not _has_data():
         _none()
         return
     c = counts()
     st.image(_svg(c), width="stretch")
-    a, b, d, e = st.columns(4)
-    with a:
-        _go("ingestion", "1  Ingestion", "h_ing")
-    with b:
-        _go("transformation", "2  Transformation", "h_tr")
-    with d:
-        _go("reporting", "3  Reporting and BI", "h_rep")
-    with e:
-        _go("validation", "Validation", "h_val")
     v = _validation_summary()
     if v:
-        st.markdown(f"**Validation:** {badge(v['status'])} {v['passed']} of {v['total']} checks passed in the latest run ({v['run_id']}).", unsafe_allow_html=True)
+        st.markdown(f"<div class='bl-done{'' if v['status'] == 'SUCCESS' else ' warn'}'>Validation: {v['passed']}/{v['total']} checks passed · Run {v['run_id']}</div>", unsafe_allow_html=True)
     else:
-        st.markdown(badge("NOT RUN") + " Validation has not been run yet. Open Validation to compare record counts with the source.", unsafe_allow_html=True)
+        st.markdown("<div class='bl-done warn'>Validation: not run yet</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- 2. ingestion
@@ -313,8 +288,6 @@ def _controls():
             st.error(str(e))
             return
         st.rerun()
-    if flow.ingested_through() is None and not busy:
-        st.caption("First time? Press Load History to bring in every record up to this date. After that, Start Ingestion loads one day at a time.")
 
 
 @st.dialog("Dry run: one row, step by step", width="large")
@@ -406,8 +379,6 @@ def _validation_summary():
 
 
 def validation():
-    st.markdown("### Validation: do the record counts match the source?")
-    st.caption("Counts and keys are compared between the source files (Finacle extract) and each BankLake layer.")
     if not _has_data():
         _none()
         return
@@ -418,14 +389,13 @@ def validation():
         rows.append({"table": e, "source": c["source"].get(e), "Bronze": c["bronze"].get(e), "Silver Merge": c["silver_merge"].get(e),
                      "Silver Transform": c["silver"].get(e), "set aside": rejected})
     table(pd.DataFrame(rows))
-    st.caption("Fewer rows after Bronze is expected: duplicates are merged, deleted records are removed, and rows that fail a rule are set aside with the reason.")
     if st.button("Run validation now", type="primary", key="val_run"):
         helpers.cli_seq(("reconcile",))
     v = _validation_summary()
     if not v:
         st.markdown(badge("NOT RUN") + " No validation run yet.", unsafe_allow_html=True)
         return
-    st.markdown(f"{badge(v['status'])} {v['passed']} of {v['total']} checks passed (run {v['run_id']}).", unsafe_allow_html=True)
+    st.markdown(f"{badge(v['status'])}&nbsp; {v['passed']}/{v['total']} checks passed · Run {v['run_id']}", unsafe_allow_html=True)
     res = pd.DataFrame(meta.query("SELECT stage, entity, check_name, source_value, target_value, status, detail FROM reconciliation_results "
                                   "WHERE run_id=? AND check_name NOT LIKE 'info_%' ORDER BY (status='PASS'), id", (v["run_id"],)))
     f = st.segmented_control("Show", ["Failures first", "All checks"], default="Failures first", key="val_filter")

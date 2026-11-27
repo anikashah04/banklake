@@ -136,7 +136,7 @@ def _transform_app():
     transform.page()
 
 
-@pytest.mark.parametrize("fn,label", [(_app, "View Details"), (_transform_app, "View Details"), (_transform_app, "SQL Migration Tool")])
+@pytest.mark.parametrize("fn,label", [(_app, "View Details"), (_transform_app, "View Details")])
 def test_dialog_buttons_open_without_error(loaded, fn, label):
     at = AppTest.from_function(fn, default_timeout=180).run()
     [b for b in at.button if b.label == label][0].click().run()

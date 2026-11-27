@@ -1,7 +1,6 @@
 """Home: the four steps of BankLake as cards with their live status, and one button that continues where the person left off.
 Every number is read from the logs and the lake; nothing here is typed in."""
 import html
-from datetime import date
 
 import streamlit as st
 
@@ -10,7 +9,7 @@ from banklake.transform import catalog, engine
 
 from .. import flow, nav
 from ..components import badge
-from . import report
+from . import etl, report
 
 
 def _facts():
@@ -33,10 +32,10 @@ def _facts():
                 total={k: sum(1 for p in catalog.PROCS if p["layer"] == k) for k in done}, n_reports=len(report.reports()))
 
 
-def _card(n, title, text, state, lines):
-    body = "".join(f"<div class='f'>{html.escape(x)}</div>" for x in lines)
-    st.markdown(f"<div class='bl-card'><div class='h'><span class='n'>{n}</span><span class='t'>{html.escape(title)}</span>{badge(state)}</div>"
-                f"<div class='d'>{html.escape(text)}</div>{body}</div>", unsafe_allow_html=True)
+def _card(n, title, state, metrics):
+    body = "".join(f"<div class='f'><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>" for k, v in metrics)
+    st.markdown(f"<div class='bl-card'><div class='h'><span class='n'>{n}</span><span class='t'>{html.escape(title)}</span>{badge(state)}</div>{body}</div>",
+                unsafe_allow_html=True)
 
 
 def _next_step(f):
@@ -55,42 +54,41 @@ def page():
     meta.init_db()
     f = _facts()
     label, target, why = _next_step(f)
-    a, b = st.columns([3.2, 1.2], vertical_alignment="center")
     working = pipeline_run.busy()
-    a.markdown(f"**{html.escape('A run is in progress. This page updates when it finishes.' if working else why)}**")
-    if b.button(label, type="primary", width="stretch", key="home_continue", disabled=working):
-        nav.open_page(target)
+    with st.container(key="home_bar"):
+        a, b = st.columns([4, 1.2], vertical_alignment="center")
+        a.markdown(f"<span class='bl-bar-text'>{html.escape('Run in progress' if working else why)}</span>", unsafe_allow_html=True)
+        if b.button(label, width="stretch", key="home_continue", disabled=working):
+            nav.open_page(target)
 
     _run_panel()
     run, d = f["run"], f["done"]
     t = f["total"]
     ing_state = "NOT STARTED" if not run else ("RUNNING" if ingest.running() else run["status"])
-    ing_lines = ["No source records loaded yet."] if not run else [
-        f"Loaded through {f['through']:%d %b %Y}" if f["through"] else "No tables loaded yet",
-        f"Last run: {run['tables_ok']} of {run['tables_total']} tables loaded" + (f", {run['tables_failed']} failed" if run["tables_failed"] else "")]
+    ing_m = [("Loaded through", f"{f['through']:%d %b %Y}" if f["through"] else "-"),
+             ("Tables loaded", f"{run['tables_ok']} / {run['tables_total']}" if run else "-")]
     silver_done = d["silver_merge"] + d["silver_transform"]
     silver_all = t["silver_merge"] + t["silver_transform"]
     if f["rd"] is None:
-        tr_state, tr_lines = "NOT STARTED", ["Needs Bronze data first."]
+        tr_state = "NOT STARTED"
     else:
         tr_state = "COMPLETED" if d["gold"] == t["gold"] and silver_done == silver_all else "NOT STARTED" if not (silver_done or d["gold"]) else "RUNNING" if engine.running() else "PARTIAL"
-        tr_lines = [f"Silver: {silver_done} of {silver_all} tables", f"Gold: {d['gold']} of {t['gold']} tables", f"Report date {f['rd']:%d %b %Y}"]
+    tr_m = [("Silver tables", f"{silver_done} / {silver_all}"), ("Gold tables", f"{d['gold']} / {t['gold']}")]
     rp_state = "NOT READY" if f["ready"] == 0 else "READY"
-    rp_lines = [f"{f['ready']} of {f['n_reports']} reports ready"] if f["rd"] else ["Needs Gold tables first."]
-    va_state = "COMPLETED" if f["validated"] else "NOT STARTED"
-    va_lines = ["Counts compared between the source and every layer." if f["validated"] else "Not run yet."]
+    rp_m = [("Reports ready", f"{f['ready']} / {f['n_reports']}"), ("Report date", f"{f['rd']:%d %b %Y}" if f["rd"] else "-")]
+    v = etl._validation_summary()
+    va_state = "NOT STARTED" if not v else v["status"]
+    va_m = [("Checks passed", f"{v['passed']} / {v['total']}" if v else "-"), ("Run", v["run_id"] if v else "-")]
 
-    cards = [("1", "Ingestion", "Load source records into Bronze. Personal data is masked here.", ing_state, ing_lines, "ingestion", "Open Ingestion"),
-             ("2", "Transformation", "Turn Bronze into Silver and Gold tables.", tr_state, tr_lines, "transformation", "Open Transformation"),
-             ("3", "Reporting and BI", "Read Gold as dashboards, reports and BI charts.", rp_state, rp_lines, "reporting", "Open Reporting"),
-             ("4", "Validation", "Check that record counts match at every layer.", va_state, va_lines, "validation", "Open Validation")]
-    cols = st.columns(4)
-    for col, (n, title, text, state, lines, page_key, btn) in zip(cols, cards):
+    cards = [("1", "Ingestion", ing_state, ing_m, "ingestion", "Open Ingestion"),
+             ("2", "Transformation", tr_state, tr_m, "transformation", "Open Transformation"),
+             ("3", "Reporting and BI", rp_state, rp_m, "reporting", "Open Reporting"),
+             ("4", "Validation", va_state, va_m, "validation", "Open Validation")]
+    for col, (n, title, state, metrics, page_key, btn) in zip(st.columns(4), cards):
         with col:
-            _card(n, title, text, state, lines)
+            _card(n, title, state, metrics)
             if st.button(btn, key=f"home_{page_key}", width="stretch"):
                 nav.open_page(page_key)
-    st.caption("Raw files  →  Bronze  →  Silver Merge  →  Silver Transform  →  Gold  →  Reports and BI")
 
 
 def _steps(run):
@@ -120,14 +118,10 @@ def _steps(run):
 
 
 def _step_rows(run):
+    """Overall fraction done across ingestion, Silver and Gold."""
     rows = _steps(run)
     done = sum(r[2] for r in rows)
     total = sum(r[3] for r in rows) or 1
-    for label, state, d, t, note in rows:
-        a, b, c = st.columns([1.2, 1.0, 3.0], vertical_alignment="center")
-        a.markdown(f"**{label}**")
-        b.markdown(badge(state), unsafe_allow_html=True)
-        c.caption(note)
     return done / total
 
 
@@ -141,33 +135,29 @@ def _live():
     st.progress(min(frac, 1.0), text={"ingest": "Loading source records into Bronze", "silver": "Building Silver", "gold": "Building Gold"}.get(run["stage"], "Working"))
 
 
-def _result(run):
-    mins = (run["ended"] - run["started"]) if run.get("ended") else 0
-    d = date.fromisoformat(run["report_date"])
+def _result(run, f):
+    secs = (run["ended"] - run["started"]) if run.get("ended") else 0
     if run["status"] == "FAILED":
         st.error(run["error"] or "The run failed. Open Transformation to see which table stopped.")
         return
-    _step_rows(run)
+    rd = run["report_date"]
+    ready = sum(all((lambda s_: s_[0] == "done" and s_[1])(report.table_state(t, rd)) for t in info["tables"]) for info in report.reports().values())
+    line = f"Completed in {secs:,.0f}s · {ready}/{len(report.reports())} reports ready"
     if run["status"] == "SUCCESS":
-        st.success(f"Pipeline finished for {d:%d %b %Y} in {mins:,.0f} seconds. Silver, Gold and every report are ready.")
+        st.markdown(f"<div class='bl-done'>{line}</div>", unsafe_allow_html=True)
     else:
-        why = [f"{len(run['failed'])} table(s) failed" if run["failed"] else "", f"{len(run['skipped'])} skipped (no Bronze data)" if run["skipped"] else ""]
-        st.warning("Finished with gaps: " + ", ".join(w for w in why if w) + ". Open Transformation for details; the rest is ready.")
+        gaps = len(run["failed"]) + len(run["skipped"])
+        st.markdown(f"<div class='bl-done warn'>{line} · {gaps} table(s) need attention, see Transformation</div>", unsafe_allow_html=True)
 
 
 def _run_panel():
     busy = pipeline_run.busy()
-    with st.container(border=True):
-        st.markdown("**Run the entire pipeline for a date**")
+    with st.container(border=True, key="home_runner"):
         a, b = st.columns([1.2, 3.0], vertical_alignment="bottom")
         with a:
             fresh = flow.ingested_through() is None
             rd = flow.pick_date("Run date", "home_date", default=flow.next_day_to_ingest() if fresh else None)
-        through = flow.ingested_through()
-        go_ = b.button("Run Entire Pipeline", type="primary", key="home_run_all", disabled=busy,
-                       help="Ingestion, then Silver Merge, Silver Transform and Gold for this date")
-        st.caption("Loads every source record up to this date into Bronze, builds Silver and Gold, then the reports are ready to open."
-                   + (f" Bronze already holds {rd:%d %b %Y}, so ingestion is skipped." if through and rd <= through else ""))
+        go_ = b.button("Run Entire Pipeline", type="primary", key="home_run_all", disabled=busy)
         if go_:
             try:
                 pipeline_run.start(rd)
@@ -179,6 +169,6 @@ def _run_panel():
         if run and pipeline_run.running():
             _live()
         elif run and run["stage"] == "done":
-            _result(run)
+            _result(run, None)
         elif busy:
-            st.info("Another run is in progress on the Ingestion or Transformation page. Wait for it to finish.")
+            st.info("Another run is in progress on the Ingestion or Transformation page.")

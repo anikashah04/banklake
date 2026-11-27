@@ -34,7 +34,7 @@ def test_pipeline_diagram_shows_real_counts_and_masking(lake):
     from bankui.views import etl
     svg = etl._svg(etl.counts())
     total_silver = sum(helpers.count("silver", e) for e in ORDER)
-    assert f"{total_silver:,} rows" in svg
+    assert f">{total_silver:,}<" in svg
     for word in ("Bronze", "Silver Merge", "Silver Transform", "Gold", "BI reports", "MASKED", "UNMASKED", "1  INGESTION", "2  TRANSFORMATION", "3  REPORTING"):
         assert word in svg, word
 
@@ -45,8 +45,7 @@ def test_validation_page_lists_every_source_table(lake):
     at._page_hash = _pages(at)["validation"]
     at.run()
     assert not at.exception, [e.value for e in at.exception]
-    text = " ".join(m.value for m in at.markdown)
-    assert "record counts match" in text
+    assert any(b.label == "Run validation now" for b in at.button)
     assert len(ORDER) == 6
 
 
@@ -81,14 +80,14 @@ assert not bad
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
 
-SLOW = ("start ingestion", "load history", "load all", "convert", "run", "view details", "sql migration", "bi dashboards", "load report data", "run all", "next:", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset", "refresh")
+SLOW = ("start ingestion", "load history", "load all", "convert", "run", "view details", "sql migration", "bi dashboards", "load report data", "run all", "next:", "generate", "build the demo", "inject", "repair", "reload", "save", "add ", "convert", "check aws", "reset")
 
 
 def test_every_safe_button_on_every_page_does_something(lake):
     """Click each button that does not start a long job; nothing may raise. (Buttons that start jobs are covered by the CLI tests.)"""
     at = AppTest.from_file(APP, default_timeout=120).run()
     pages = _pages(at)
-    clicked, problems = 0, []
+    clicked, problems, seen = 0, [], []
     for name, h in pages.items():
         at._page_hash = h
         at.run()
@@ -106,9 +105,10 @@ def test_every_safe_button_on_every_page_does_something(lake):
                 problems.append((name, label, repr(e)[:150]))
                 continue
             clicked += 1
+            seen.append((name, label))
             if at.exception:
                 problems.append((name, label, [x.value[:120] for x in at.exception]))
-    assert clicked >= 4, clicked
+    assert clicked >= 4, (clicked, seen)
     assert not problems, problems
 
 

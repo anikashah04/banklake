@@ -75,7 +75,7 @@ Demo-grade crypto: the key comes from `BANKLAKE_MASK_KEY`; in production it woul
 |---|---|
 | ETL Pipeline | Source → 1 Ingestion (Bronze) → 2 Transformation (Silver Merge, Silver Transform, Gold) → 3 Reporting (BI), with live row counts and masked/unmasked layers |
 | 1 Ingestion | three source databases, one **Start Ingestion** button, load-frequency rules, live pipeline diagram, per-table results and Bronze inspector |
-| 2 Transformation | Single pipeline view (Bronze → Silver Merge → Silver Transform → Gold) with real status colours; pick Silver or Gold, search a transformation (89 procedures named by target table), Run (missing upstream tables run first), View Details for Teradata SQL, Athena SQL, EMR script, target data, metadata and audit log; SQL Migration Tool on its own button |
+| 2 Transformation | Single pipeline view (Bronze → Silver Merge → Silver Transform → Gold) with real status colours; pick Silver or Gold, search a transformation (89 procedures named by target table), Run (missing upstream tables run first), View Details for Teradata SQL, Athena SQL, EMR script, target data, metadata and audit log |
 | 3 Reporting and BI | 18 reports in four kinds (Dashboard: key numbers and four charts; Report: table with totals plus a chart; Regulatory: fixed-format return that reconciles to Gold; BI: pick your own chart from 17 types) for any report date, export CSV; View Details shows lineage, SQL, data quality and audit log; the original BI dashboards sit behind their own button |
 | Validation | record counts source vs each layer, and the reconciliation checks |
 

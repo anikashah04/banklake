@@ -1,13 +1,14 @@
 """BankLake design system: one stylesheet. Navy sidebar, light workspace, muted blue accent, compact type."""
 import streamlit as st
 
-NAVY, NAVY_2, ACCENT, INK, MUTED, LINE = "#172334", "#22344D", "#2F5D8A", "#1B2430", "#5E6B7D", "#DDE2E9"
+NAVY, NAVY_2, ACCENT, INK, MUTED, LINE = "#0F2942", "#1B3A5C", "#0F2942", "#1B2430", "#475569", "#D8E0E8"
+GOLD, GREEN, RED, PANEL, BG = "#B8860B", "#1E6B4B", "#A62626", "#EEF2F6", "#F5F7FA"
 STATUS = {  # status -> (text colour, background)
-    "SUCCESS": ("#1E6B49", "#E3F1EA"), "OK": ("#1E6B49", "#E3F1EA"), "AVAILABLE": ("#1E6B49", "#E3F1EA"), "PASS": ("#1E6B49", "#E3F1EA"),
-    "FAILED": ("#A3302A", "#F8E4E2"), "FAIL": ("#A3302A", "#F8E4E2"), "HIGH": ("#A3302A", "#F8E4E2"),
+    "SUCCESS": ("#1E6B4B", "#E3F1EA"), "OK": ("#1E6B4B", "#E3F1EA"), "AVAILABLE": ("#1E6B4B", "#E3F1EA"), "PASS": ("#1E6B4B", "#E3F1EA"),
+    "FAILED": ("#A62626", "#F8E4E2"), "FAIL": ("#A62626", "#F8E4E2"), "HIGH": ("#A62626", "#F8E4E2"),
     "RUNNING": ("#2F5D8A", "#E3ECF5"), "BLOCKED": ("#8A5A12", "#FBF0DC"), "MEDIUM": ("#8A5A12", "#FBF0DC"), "WARNING": ("#8A5A12", "#FBF0DC"),
     "SKIPPED": ("#5E6B7D", "#ECEFF3"), "NOT RUN": ("#5E6B7D", "#ECEFF3"), "LOW": ("#5E6B7D", "#ECEFF3"), "INFO": ("#2F5D8A", "#E3ECF5"),
-    "COMPLETED": ("#1E6B49", "#E3F1EA"), "READY": ("#1E6B49", "#E3F1EA"), "NOT READY": ("#5E6B7D", "#ECEFF3"), "WARNINGS": ("#8A5A12", "#FBF0DC"), "NOT STARTED": ("#5E6B7D", "#ECEFF3"),
+    "COMPLETED": ("#1E6B4B", "#E3F1EA"), "READY": ("#1E6B4B", "#E3F1EA"), "NOT READY": ("#5E6B7D", "#ECEFF3"), "WARNINGS": ("#8A5A12", "#FBF0DC"), "NOT STARTED": ("#5E6B7D", "#ECEFF3"),
     "PARTIAL": ("#8A5A12", "#FBF0DC"), "NOT CONFIGURED": ("#5E6B7D", "#ECEFF3"), "PLANNED": ("#5E6B7D", "#ECEFF3"), "UNAVAILABLE": ("#5E6B7D", "#ECEFF3"),
     "NOT ENABLED": ("#5E6B7D", "#ECEFF3"), "NO DATA": ("#5E6B7D", "#ECEFF3"),
 }
@@ -45,19 +46,24 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 .bl-brand b {{ color:#fff !important; font-size:.98rem; letter-spacing:.14em; }}
 .bl-brand small {{ display:block; color:#7F8FA6 !important; font-size:.62rem; letter-spacing:.04em; }}
 
-/* header bar */
-.bl-top {{ display:flex; align-items:center; justify-content:space-between; gap:1rem; border:1px solid {LINE}; background:#FAFBFC; border-radius:4px; padding:.45rem .8rem; margin-bottom:.7rem; }}
-.bl-top .t {{ font-size:1.05rem; font-weight:650; color:{INK}; }}
-.bl-top .m {{ display:flex; gap:1.1rem; align-items:center; flex-wrap:wrap; }}
-.bl-top .k {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.07em; color:{MUTED}; display:block; line-height:1.1; }}
-.bl-top .v {{ font-size:.8rem; color:{INK}; font-weight:550; }}
-
-/* step bar */
-[class*="st-key-step_"] button {{ min-height:2.2rem; font-size:.84rem; border-radius:4px; }}
-[class*="st-key-step_current_"] button {{ background:#1757A0; border-color:#1757A0; color:#fff; font-weight:650; cursor:default; }}
-[class*="st-key-step_next_"] button {{ border:1.5px solid #257de0; color:#1757A0; font-weight:650; background:#EAF3FD; }}
-[class*="st-key-step_other_"] button {{ background:#fff; color:{INK}; border-color:{LINE}; }}
-[class*="st-key-step_"] {{ margin-bottom:.3rem; }}
+/* header bar: navy, one row */
+.stApp {{ background:{BG}; }}
+.st-key-bl_head {{ background:{NAVY}; border-radius:4px; padding:.35rem .8rem; margin-bottom:.6rem; }}
+.st-key-bl_head [data-testid="stHorizontalBlock"] {{ align-items:center; }}
+.bl-brand2 {{ color:#fff; font-weight:700; letter-spacing:.14em; font-size:.95rem; white-space:nowrap; border-left:3px solid {GOLD}; padding-left:.55rem; }}
+.st-key-bl_head [class*="st-key-step_"] {{ margin:0; }}
+.st-key-bl_head [class*="st-key-step_"] button {{ background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0; color:#B9C6D6; font-size:.82rem; font-weight:500; min-height:2.1rem; padding:.15rem .3rem; box-shadow:none; }}
+.st-key-bl_head [class*="st-key-step_"] button:hover {{ color:#fff; background:transparent; }}
+.st-key-bl_head [class*="st-key-step_"] button p {{ white-space:nowrap; }}
+.st-key-bl_head [class*="st-key-step_current_"] button {{ color:#fff; font-weight:650; border-bottom:2px solid {GOLD}; cursor:default; }}
+.st-key-bl_head [class*="st-key-step_next_"] button {{ color:#E8D9A8; }}
+.st-key-bl_head .st-key-bl_refresh button {{ background:transparent; border:1px solid #4A6585; color:#DCE5EF; font-size:.76rem; min-height:1.8rem; padding:.05rem .5rem; }}
+.bl-meta {{ display:flex; gap:0; align-items:stretch; background:#fff; border:1px solid {LINE}; border-radius:4px; }}
+.bl-meta > div {{ padding:.3rem .8rem; border-right:1px solid {LINE}; }}
+.bl-meta > div:last-child {{ border-right:none; }}
+.bl-meta .k {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.07em; color:{MUTED}; display:block; line-height:1.1; }}
+.bl-meta .v {{ font-size:.8rem; color:{INK}; font-weight:550; }}
+.bl-foot {{ text-align:center; color:#64748B; font-size:.72rem; margin-top:1.2rem; }}
 
 /* components */
 .bl-badge {{ display:inline-block; font-size:.66rem; font-weight:650; letter-spacing:.04em; padding:.08rem .42rem; border-radius:3px; white-space:nowrap; }}
@@ -82,7 +88,7 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 .bl-warn {{ font-size:.66rem; color:#8A5A0B; background:#FBF1DC; border-radius:3px; padding:.06rem .35rem; white-space:nowrap; }}
 .bl-arrow {{ display:flex; align-items:center; justify-content:center; height:11.5rem; color:#8794A7; font-size:1.2rem; }}
 .bl-chips {{ display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.2rem; }}
-.bl-chip {{ flex:1; min-width:9rem; border:1px solid {LINE}; border-left:3px solid #9AA6B6; border-radius:3px; padding:.35rem .6rem; background:#FAFBFC; }}
+.bl-chip {{ flex:1; min-width:9rem; border:1px solid {LINE}; border-left:3px solid #9AA6B6; border-radius:3px; padding:.35rem .6rem; background:{PANEL}; }}
 .bl-chip .h {{ font-size:.7rem; font-weight:650; color:{INK}; }}
 .bl-chip .s {{ font-size:.68rem; color:{MUTED}; }}
 .bl-note {{ border-left:3px solid #C48A1D; background:#FBF6EA; padding:.4rem .7rem; font-size:.8rem; color:#5A4513; margin:.3rem 0; }}
@@ -94,14 +100,30 @@ button[kind="primary"] {{ background:{ACCENT}; border-color:{ACCENT}; }}
 [data-testid="stExpander"] summary {{ font-size:.82rem; }}
 hr {{ margin: .6rem 0; }}
 
+[data-testid="stImage"] button, [data-testid="stImage"] [data-testid="StyledFullScreenButton"] {{ display:none !important; }}
+.st-key-tr_card {{ background:#fff; }}
+.bl-k {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.07em; color:{MUTED}; }}
+.bl-v {{ font-size:.86rem; color:{INK}; overflow-wrap:anywhere; }}
+.bl-v.b {{ font-weight:700; font-size:.95rem; }}
+.bl-v.num {{ font-variant-numeric:tabular-nums; text-align:right; }}
+.bl-err {{ color:{RED}; font-size:.78rem; padding-top:.3rem; border-top:1px solid {PANEL}; }}
+/* home */
+.st-key-home_bar {{ background:{NAVY}; border-left:4px solid {GOLD}; border-radius:4px; padding:.5rem .9rem; margin-bottom:.7rem; }}
+.st-key-home_bar .bl-bar-text {{ color:#fff; font-size:.95rem; font-weight:550; }}
+.st-key-home_bar button {{ background:transparent; border:1px solid {GOLD}; color:#F3E3B0; }}
+.st-key-home_bar button:hover {{ background:{GOLD}; color:#fff; border-color:{GOLD}; }}
+.st-key-home_runner {{ background:#fff; border:1px solid {LINE}; border-radius:4px; }}
+.bl-done {{ color:{GREEN}; font-weight:600; font-size:.9rem; padding:.2rem 0; }}
+.bl-done.warn {{ color:{GOLD}; }}
 /* home cards */
-.bl-card {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.8rem .9rem; min-height:11rem; margin-bottom:.5rem; }}
+.bl-card {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.8rem .9rem; margin-bottom:.5rem; }}
 .bl-card .h {{ display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }}
-.bl-card .n {{ width:1.4rem; height:1.4rem; border-radius:50%; background:{ACCENT}; color:#fff; font-size:.75rem; font-weight:650; display:flex; align-items:center; justify-content:center; }}
+.bl-card .n {{ width:1.4rem; height:1.4rem; border-radius:50%; background:{NAVY}; color:#fff; font-size:.75rem; font-weight:650; display:flex; align-items:center; justify-content:center; }}
 .bl-card .t {{ font-weight:650; color:{INK}; flex:1; }}
 .bl-card .d {{ color:{MUTED}; font-size:.82rem; margin-bottom:.55rem; }}
-.bl-card .f {{ font-size:.84rem; color:{INK}; padding:.12rem 0; }}
-.bl-kpi {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.65rem .85rem .55rem; border-top:3px solid #257de0; margin-bottom:.6rem; min-height:6.4rem; }}
+.bl-card .f {{ display:flex; justify-content:space-between; font-size:.84rem; color:{MUTED}; padding:.25rem 0; border-top:1px solid #EEF2F6; }}
+.bl-card .f b {{ color:{INK}; font-weight:600; font-variant-numeric:tabular-nums; }}
+.bl-kpi {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.65rem .85rem .55rem; border-top:3px solid {GOLD}; margin-bottom:.6rem; min-height:6.4rem; }}
 .bl-kpi .k {{ font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:{MUTED}; }}
 .bl-kpi .v {{ font-size:1.65rem; font-weight:650; color:{INK}; line-height:1.25; }}
 .bl-kpi .s {{ font-size:.76rem; color:{MUTED}; }}

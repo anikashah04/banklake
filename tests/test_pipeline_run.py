@@ -69,7 +69,7 @@ labels = [b.label for b in at.button]
 assert "Run Entire Pipeline" in labels and "Open Reporting" in labels, labels
 assert not [b for b in at.button if b.label == "Run Entire Pipeline"][0].disabled
 text = " ".join(m.value for m in at.markdown) + " ".join(s.value for s in at.success)
-assert "Silver, Gold and every report are ready" in text, text[-500:]
+assert "Completed in" in text and "18/18 reports ready" in text, text[-500:]
 print("OK")
 """ % str(ROOT / "dashboard" / "app.py"), tmp_path)
     assert "OK" in out

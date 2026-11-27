@@ -35,34 +35,34 @@ pages = {
 nav.PAGES.update(pages)
 current = st.navigation(list(pages.values()), position="hidden")   # one navigation bar only: the step bar under the title
 
-# ------------------------------------------------------------------ header bar
-SUBTITLE = {"home": "Pick up where you left off, or open any step.",
-            "validation": "Check that record counts match between the source and every layer.",
-            "ingestion": "Load one business day from the three source systems into Bronze. Personal data is masked here.",
-            "transformation": "Turn Bronze into Silver and Gold tables for a report date.",
-            "reporting": "Read the Gold tables as reports, dashboards and BI analysis."}
+# ------------------------------------------------------------------ header: one navy bar, one row of tabs, compact Refresh
 key = next((k for k, p in pages.items() if p is current), "home")
-legacy_page = key in ("overview", "validation")   # these two still show the run header and Actions
-hs = state.header_state()
-bar, refresh_col, actions_col = st.columns([9, 1.1, 1.2] if legacy_page else [9, 1.1, 0.01], vertical_alignment="center", gap="small")
-meta_html = ""
+legacy_page = key in ("overview", "validation")   # these two still show the run strip and Actions
+FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
+STEP_LABEL = {"home": "Home", "ingestion": "1  Ingestion", "transformation": "2  Transformation", "reporting": "3  Reporting and BI", "validation": "Validation", "overview": "Pipeline Overview"}
+following = FLOW[FLOW.index(key) + 1] if key in FLOW and key != "home" and FLOW.index(key) < len(FLOW) - 1 else None
+with st.container(key="bl_head"):
+    cols = st.columns([1.1, 0.7, 1.15, 1.35, 1.7, 0.95, 1.35, 0.7], gap="small", vertical_alignment="center")
+    cols[0].markdown('<div class="bl-brand2">BANKLAKE</div>', unsafe_allow_html=True)
+    for col, (pk, label) in zip(cols[1:7], STEP_LABEL.items()):
+        cls = "step_current" if pk == key else "step_next" if pk == following else "step_other"
+        if col.button(label, key=f"{cls}_{pk}", width="stretch", help="Next step" if pk == following else None) and pk != key:
+            nav.open_page(pk)
+    with cols[7]:
+        if st.button("Refresh", key="bl_refresh", width="stretch", help="Reload the logs and tables"):
+            st.cache_data.clear()
+            st.rerun()
+
 if legacy_page:
+    hs = state.header_state()
     last_ok = (hs["last_success"] or "none yet")
-    meta_html = (f'<div class="m"><div><span class="k">Environment</span><span class="v">{state.environment()}</span></div>'
-                 f'<div><span class="k">Run ID</span><span class="v">{hs["run_id"] or "-"}</span></div>'
-                 f'<div><span class="k">Batch</span><span class="v">{hs["batch"] if hs["batch"] is not None else "-"}</span></div>'
-                 f'<div><span class="k">Pipeline status</span><span class="v">{badge(hs["status"])}</span></div>'
-                 f'<div><span class="k">Last successful run</span><span class="v">{last_ok}</span></div></div>')
-sub = SUBTITLE.get(key)
-bar.markdown(f'<div class="bl-top"><div class="t">{current.title.strip()}'
-             f'{f"<div style=\'font-weight:400;font-size:.82rem;color:#6B7280;margin-top:.1rem\'>{sub}</div>" if sub else ""}</div>{meta_html}</div>',
-             unsafe_allow_html=True)
-if refresh_col.button("Refresh", width="stretch", help="Reload the logs and tables"):
-    st.cache_data.clear()
-    st.rerun()
-if legacy_page:
+    m_col, actions_col = st.columns([9, 1.2], vertical_alignment="center", gap="small")
+    m_col.markdown(f'<div class="bl-meta"><div><span class="k">Environment</span><span class="v">{state.environment()}</span></div>'
+                   f'<div><span class="k">Run ID</span><span class="v">{hs["run_id"] or "-"}</span></div>'
+                   f'<div><span class="k">Batch</span><span class="v">{hs["batch"] if hs["batch"] is not None else "-"}</span></div>'
+                   f'<div><span class="k">Status</span><span class="v">{badge(hs["status"])}</span></div>'
+                   f'<div><span class="k">Last successful run</span><span class="v">{last_ok}</span></div></div>', unsafe_allow_html=True)
     with actions_col.popover("Actions", width="stretch"):
-        st.caption("Each action runs the real command (python main.py ...) and refreshes the console.")
         scale = st.radio("Sample data size", ["small", "full"], horizontal=True, key="act_scale", format_func=lambda x: "Small (~1,000 customers)" if x == "small" else "Full (10,000 customers)")
         if st.button("Generate sample data (resets the lake)", key="act_gen", width="stretch"):
             helpers.cli_seq(("reset",), ("generate", "--scale", scale))
@@ -75,18 +75,6 @@ if legacy_page:
         if st.button("Run reconciliation", key="act_rec", width="stretch"):
             helpers.cli_seq(("reconcile",))
 
-# ------------------------------------------------------------------ step bar: the only navigation, same on every page
-FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
-STEP_LABEL = {"home": "Home", "ingestion": "1  Ingestion", "transformation": "2  Transformation", "reporting": "3  Reporting and BI", "validation": "Validation", "overview": "Pipeline Overview"}
-STEP_ICON = {"home": ":material/home:", "ingestion": ":material/upload_file:", "transformation": ":material/transform:", "reporting": ":material/bar_chart:",
-             "validation": ":material/fact_check:", "overview": ":material/account_tree:"}
-following = FLOW[FLOW.index(key) + 1] if key in FLOW and key != "home" and FLOW.index(key) < len(FLOW) - 1 else None
-for col, (pk, label) in zip(st.columns(len(STEP_LABEL), gap="small"), STEP_LABEL.items()):
-    cls = "step_current" if pk == key else "step_next" if pk == following else "step_other"
-    if col.button(label, icon=STEP_ICON[pk], key=f"{cls}_{pk}", width="stretch", type="primary" if pk == key else "secondary",
-                  help="You are here" if pk == key else "Next step" if pk == following else None) and pk != key:
-        nav.open_page(pk)
-
 if "_last_action" in st.session_state:
     rc, cmd, out = st.session_state.pop("_last_action")
     (st.success if rc == 0 else st.error)(f"Finished: {cmd}" if rc == 0 else f"Finished with problems: {cmd}")
@@ -95,4 +83,4 @@ if "_last_action" in st.session_state:
 
 current.run()
 
-st.caption("Personal data is masked at Bronze and stays masked in every later layer. Synthetic data only; independent academic project, no client data or code.")
+st.markdown('<div class="bl-foot">BankLake · synthetic data</div>', unsafe_allow_html=True)
