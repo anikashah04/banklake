@@ -93,7 +93,7 @@ def test_every_safe_button_on_every_page_does_something(lake):
         at._page_hash = h
         at.run()
         for label, key in [(b.label, b.key) for b in at.button]:
-            if any(w in label.lower() for w in SLOW) or str(key).startswith(("nav_", "home_")):
+            if any(w in label.lower() for w in SLOW) or str(key).startswith(("step_", "home_")):
                 continue
             at._page_hash = h
             at.run()
@@ -112,20 +112,23 @@ def test_every_safe_button_on_every_page_does_something(lake):
     assert not problems, problems
 
 
-def test_every_page_but_home_has_back_home_and_next(lake):
-    expect = {"ingestion": ["← Home", "Home", "2  Transformation →"], "transformation": ["← 1  Ingestion", "Home", "3  Reporting and BI →"],
-              "reporting": ["← 2  Transformation", "Home", "Validation →"], "validation": ["← 3  Reporting and BI", "Home"], "overview": ["Home"]}
+def test_every_page_has_the_same_step_bar_with_the_current_step_marked(lake):
+    labels = ["Home", "1  Ingestion", "2  Transformation", "3  Reporting and BI", "Validation", "Pipeline Overview"]
+    order = ["home", "ingestion", "transformation", "reporting", "validation", "overview"]
+    following = {"ingestion": "transformation", "transformation": "reporting", "reporting": "validation"}
     at = AppTest.from_file(APP, default_timeout=120).run()
     pages = _pages(at)
-    for name, labels in expect.items():
+    for name in order:
         at._page_hash = pages[name]
         at.run()
-        have = [b.label for b in at.button if str(b.key).startswith("nav_")]
-        assert have == labels, (name, have)
-    at._page_hash = pages["home"]
-    at.run()
-    assert not [b for b in at.button if str(b.key).startswith("nav_")]
-    assert {b.key for b in at.button if str(b.key).startswith("home_")} >= {"home_continue", "home_run_all", "home_ingestion", "home_transformation", "home_reporting", "home_validation"}
+        assert not at.exception, (name, [e.value for e in at.exception])
+        steps = [b for b in at.button if str(b.key).startswith("step_")]
+        assert [b.label for b in steps] == labels, (name, [b.label for b in steps])
+        cur = [b for b in steps if str(b.key).startswith("step_current_")]
+        assert [b.key for b in cur] == [f"step_current_{name}"], (name, [b.key for b in cur])
+        nxt = [b.key for b in steps if str(b.key).startswith("step_next_")]
+        assert nxt == ([f"step_next_{following[name]}"] if name in following else []), (name, nxt)
+        assert not [b for b in at.button if b.label.startswith(("Next:", "Back"))], name       # no second set of forward buttons
 
 
 def test_home_continue_button_follows_real_progress():

@@ -1,6 +1,5 @@
 """The charts Altair cannot draw: pie, treemap, sunburst, radar, gauge and five 3D charts, built with Plotly on the same palette.
 Same rules as charts.py: categories coloured in a fixed order (9th+ folds into Other), one hue light-to-dark for magnitude, quiet grid, hover on every mark."""
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 

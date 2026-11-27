@@ -292,7 +292,7 @@ def _inspect(t):
 
 def _controls():
     from .. import flow
-    c1, c2, c2h, c2b, c3, c4 = st.columns([1.1, 1.0, 1.0, 0.8, 1.1, 1.4], vertical_alignment="bottom")
+    c1, c2, c2h, c2b, c3 = st.columns([1.1, 1.0, 1.0, 0.8, 1.6], vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Business date", "ing_date", flow.next_day_to_ingest() if "_bl_date" not in st.session_state else None)
     busy = ingest.running()
@@ -306,9 +306,6 @@ def _controls():
     if snap:
         state = "RUNNING" if busy else snap["status"]
         c3.markdown(f"{badge(state)}&nbsp; <span style='color:#6B7280;font-size:.85rem'>{pd.Timestamp(snap['business_date']):%d %b %Y}</span>", unsafe_allow_html=True)
-        if not busy and snap["status"] in ("SUCCESS", "PARTIAL") and flow.ingested_through():
-            with c4:
-                flow.go("Next: Transformation", "transformation", "ing_next", primary=True)
     if go or hist:
         try:
             ingest.start(bd, pace=0.25 if go else 0.0, history=bool(hist))
@@ -358,7 +355,6 @@ def _dry_run_dialog(bd):
     st.success("Dry run complete. Nothing was written to Bronze or the vault.")
 
 
-def ingestion():
     from .. import flow
     _prepare()
     _controls()

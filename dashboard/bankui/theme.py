@@ -26,6 +26,7 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 [data-testid="stCaptionContainer"] {{ color: #4B5563; font-size: .88rem; }}
 
 /* sidebar */
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] {{ display: none !important; }}
 [data-testid="stSidebar"] {{ background: {NAVY}; border-right: 1px solid #0A1424; min-width: 15rem; }}
 [data-testid="stSidebar"] * {{ color: #C7D2E2; }}
 [data-testid="stSidebar"] [data-testid="stSidebarHeader"] {{ padding-bottom: 0; }}
@@ -50,6 +51,13 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 .bl-top .m {{ display:flex; gap:1.1rem; align-items:center; flex-wrap:wrap; }}
 .bl-top .k {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.07em; color:{MUTED}; display:block; line-height:1.1; }}
 .bl-top .v {{ font-size:.8rem; color:{INK}; font-weight:550; }}
+
+/* step bar */
+[class*="st-key-step_"] button {{ min-height:2.2rem; font-size:.84rem; border-radius:4px; }}
+[class*="st-key-step_current_"] button {{ background:#1757A0; border-color:#1757A0; color:#fff; font-weight:650; cursor:default; }}
+[class*="st-key-step_next_"] button {{ border:1.5px solid #257de0; color:#1757A0; font-weight:650; background:#EAF3FD; }}
+[class*="st-key-step_other_"] button {{ background:#fff; color:{INK}; border-color:{LINE}; }}
+[class*="st-key-step_"] {{ margin-bottom:.3rem; }}
 
 /* components */
 .bl-badge {{ display:inline-block; font-size:.66rem; font-weight:650; letter-spacing:.04em; padding:.08rem .42rem; border-radius:3px; white-space:nowrap; }}

@@ -12,7 +12,7 @@ import streamlit as st
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-st.set_page_config(page_title="BankLake", page_icon=":material/database:", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="BankLake", page_icon=":material/database:", layout="wide", initial_sidebar_state="collapsed")
 
 from bankui import helpers, nav, state, theme  # noqa: E402
 from bankui.components import badge  # noqa: E402
@@ -33,12 +33,7 @@ pages = {
     "overview": P(etl.home, title="Pipeline Overview", icon=":material/account_tree:", url_path="overview"),
 }
 nav.PAGES.update(pages)
-SECTIONS = {"": ["home"], "Pipeline": ["ingestion", "transformation", "reporting"], "Checks": ["validation", "overview"]}
-current = st.navigation({k: [pages[x] for x in v] for k, v in SECTIONS.items()}, position="sidebar", expanded=True)
-
-with st.sidebar:
-    st.caption("Personal data is masked at Bronze and stays masked in every later layer.")
-    st.caption("Synthetic data only. Independent academic project; no client data or code.")
+current = st.navigation(list(pages.values()), position="hidden")   # one navigation bar only: the step bar under the title
 
 # ------------------------------------------------------------------ header bar
 SUBTITLE = {"home": "Pick up where you left off, or open any step.",
@@ -80,6 +75,18 @@ if legacy_page:
         if st.button("Run reconciliation", key="act_rec", width="stretch"):
             helpers.cli_seq(("reconcile",))
 
+# ------------------------------------------------------------------ step bar: the only navigation, same on every page
+FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
+STEP_LABEL = {"home": "Home", "ingestion": "1  Ingestion", "transformation": "2  Transformation", "reporting": "3  Reporting and BI", "validation": "Validation", "overview": "Pipeline Overview"}
+STEP_ICON = {"home": ":material/home:", "ingestion": ":material/upload_file:", "transformation": ":material/transform:", "reporting": ":material/bar_chart:",
+             "validation": ":material/fact_check:", "overview": ":material/account_tree:"}
+following = FLOW[FLOW.index(key) + 1] if key in FLOW and key != "home" and FLOW.index(key) < len(FLOW) - 1 else None
+for col, (pk, label) in zip(st.columns(len(STEP_LABEL), gap="small"), STEP_LABEL.items()):
+    cls = "step_current" if pk == key else "step_next" if pk == following else "step_other"
+    if col.button(label, icon=STEP_ICON[pk], key=f"{cls}_{pk}", width="stretch", type="primary" if pk == key else "secondary",
+                  help="You are here" if pk == key else "Next step" if pk == following else None) and pk != key:
+        nav.open_page(pk)
+
 if "_last_action" in st.session_state:
     rc, cmd, out = st.session_state.pop("_last_action")
     (st.success if rc == 0 else st.error)(f"Finished: {cmd}" if rc == 0 else f"Finished with problems: {cmd}")
@@ -88,19 +95,4 @@ if "_last_action" in st.session_state:
 
 current.run()
 
-# ------------------------------------------------------------------ the same way forward and back on every page
-FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
-if key == "overview":
-    st.divider()
-    if st.columns([1, 2])[0].button("Home", key="nav_home", width="stretch"):
-        nav.open_page("home")
-elif key in FLOW and key != "home":
-    i = FLOW.index(key)
-    st.divider()
-    back, mid, fwd = st.columns([1, 1, 1])
-    if back.button(f"← {pages[FLOW[i - 1]].title.strip()}", key="nav_back", width="stretch"):
-        nav.open_page(FLOW[i - 1])
-    if mid.button("Home", key="nav_home", width="stretch"):
-        nav.open_page("home")
-    if i < len(FLOW) - 1 and fwd.button(f"{pages[FLOW[i + 1]].title.strip()} →", key="nav_next", width="stretch"):
-        nav.open_page(FLOW[i + 1])
+st.caption("Personal data is masked at Bronze and stays masked in every later layer. Synthetic data only; independent academic project, no client data or code.")

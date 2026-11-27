@@ -322,6 +322,4 @@ def page():
     if st.session_state.pop("_tr_was_running", False):
         st.cache_data.clear()
     _view(pid, rd)
-    if engine.loaded(catalog.BY_ID[pid]["target"], catalog.BY_ID[pid]["layer"], rd):
-        if catalog.BY_ID[pid]["layer"] == "gold":
-            flow.go("Next: Reporting", "reporting", "tr_next", primary=True)
+
