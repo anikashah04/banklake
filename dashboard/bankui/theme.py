@@ -116,6 +116,11 @@ hr {{ margin: .6rem 0; }}
 .st-key-bl_head [data-testid="stMarkdownContainer"] {{ margin-bottom:0 !important; }}
 .st-key-bl_head [data-testid="stMarkdownContainer"] p {{ margin:0 !important; }}
 .bl-brand2 {{ transform:translateY(5px); }}
+.bl-chain {{ display:flex; align-items:center; gap:.5rem; margin:.3rem 0 .4rem 0; font-size:.88rem; }}
+.bl-st.done {{ color:{GREEN}; font-weight:600; }}
+.bl-st.now {{ color:{INK}; font-weight:700; border-bottom:2px solid {LIME}; }}
+.bl-st.next {{ color:#9AA3AF; }}
+.bl-sep {{ color:#9AA3AF; }}
 /* home */
 .st-key-home_bar {{ background:{NAVY}; border-left:4px solid {LIME}; border-radius:4px; padding:.5rem .9rem; margin-bottom:.7rem; }}
 .st-key-home_bar .bl-bar-text {{ color:#fff; font-size:.95rem; font-weight:550; }}

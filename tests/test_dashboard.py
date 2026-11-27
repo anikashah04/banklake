@@ -35,7 +35,7 @@ def test_pipeline_diagram_shows_real_counts_and_masking(lake):
     svg = etl._svg(etl.counts())
     total_silver = sum(helpers.count("silver", e) for e in ORDER)
     assert f">{total_silver:,}<" in svg
-    for word in ("Bronze", "Silver Merge", "Silver Transform", "Gold", "BI reports", "MASKED", "UNMASKED", "1  INGESTION", "2  TRANSFORMATION", "3  REPORTING"):
+    for word in ("Source", "Bronze Ingestion", "Silver Merge", "Silver Transform", "Gold", "BI reports", "MASKED", "UNMASKED", "1  INGESTION", "2  TRANSFORMATION", "3  REPORTING"):
         assert word in svg, word
 
 
@@ -142,3 +142,12 @@ def test_home_continue_button_follows_real_progress():
     full = dict(half, ready=5)
     label, page, why = home._next_step(full)
     assert (label, page) == ("Open Reporting", "reporting") and "5 of 18 reports" in why
+
+
+def test_run_chain_always_starts_at_the_source():
+    from bankui.views import home
+    out = home._chain(dict(stage="ingest", ingest_skipped=False))
+    assert out.index("Source") < out.index("Bronze Ingestion") < out.index("Silver") < out.index("Gold")
+    assert "bl-st now'>Bronze Ingestion" in out and "bl-st done'>Source" in out
+    assert "bl-st done'>Bronze Ingestion" in home._chain(dict(stage="silver", ingest_skipped=False))
+    assert "bl-st done'>Bronze Ingestion" in home._chain(dict(stage="gold", ingest_skipped=True))

@@ -75,9 +75,9 @@ def _none():
 # ---------------------------------------------------------------- 1. the pipeline
 def _svg(c):
     tot = lambda d: sum(v or 0 for v in d.values()) if d else 0  # noqa: E731
-    br, mg, sv = tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
+    src, br, mg, sv = tot(c["source"]), tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
     n_gold = sum(v is not None for v in c["gold"].values())
-    W, H = 1070, 250
+    W, H = 1240, 250
     o = [f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman, Times, serif">',
          f'<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{MUTE}"/></marker></defs>']
 
@@ -99,18 +99,20 @@ def _svg(c):
 
     f = lambda v: "-" if not v else f"{v:,}"  # noqa: E731
     H = 130
-    group(10, 200, "1  INGESTION", NAVY)
-    box(24, 62, 172, H, "Bronze Ingestion", f(br), NAVY, "MASKED")
-    arrow(210, 240, 127)
-    group(240, 560, "2  TRANSFORMATION", NAVY)
-    box(254, 62, 160, H, "Silver Merge", f(mg), NAVY, "MASKED")
-    arrow(414, 440, 127)
-    box(440, 62, 160, H, "Silver Transform", f(sv), NAVY, "MASKED")
-    arrow(600, 626, 127)
-    box(626, 62, 160, H, "Gold", f"{n_gold} tables", GREEN, "UNMASKED")
-    arrow(800, 830, 127)
-    group(830, 230, "3  REPORTING", GREEN)
-    box(844, 62, 202, H, "BI reports", f"{n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
+    box(10, 62, 140, 130, "Source", f(src), "#475569")
+    arrow(150, 180, 127)
+    group(180, 200, "1  INGESTION", NAVY)
+    box(194, 62, 172, 130, "Bronze Ingestion", f(br), NAVY, "MASKED")
+    arrow(380, 410, 127)
+    group(410, 560, "2  TRANSFORMATION", NAVY)
+    box(424, 62, 160, 130, "Silver Merge", f(mg), NAVY, "MASKED")
+    arrow(584, 610, 127)
+    box(610, 62, 160, 130, "Silver Transform", f(sv), NAVY, "MASKED")
+    arrow(770, 796, 127)
+    box(796, 62, 160, 130, "Gold", f"{n_gold} tables", GREEN, "UNMASKED")
+    arrow(970, 1000, 127)
+    group(1000, 230, "3  REPORTING", GREEN)
+    box(1014, 62, 202, 130, "BI reports", f"{n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
     o.append("</svg>")
     return "".join(o)
 

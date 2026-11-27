@@ -126,6 +126,19 @@ def _step_rows(run):
     return done / total
 
 
+def _chain(run):
+    """The path every run takes, with where it is now: Source, Bronze Ingestion, Silver, Gold."""
+    names = ["Source", "Bronze Ingestion", "Silver", "Gold"]
+    at = {"ingest": 1, "silver": 2, "gold": 3}.get(run["stage"], 4)
+    if run["ingest_skipped"]:
+        at = max(at, 2)
+    parts = []
+    for i, n in enumerate(names):
+        cls = "done" if i < at else "now" if i == at else "next"
+        parts.append(f"<span class='bl-st {cls}'>{n}</span>")
+    return "<div class='bl-chain'>" + "<span class='bl-sep'>&rarr;</span>".join(parts) + "</div>"
+
+
 @st.fragment(run_every=0.5)
 def _live():
     run = pipeline_run.current()
@@ -133,6 +146,7 @@ def _live():
         st.rerun()
         return
     frac = _step_rows(run)
+    st.markdown(_chain(run), unsafe_allow_html=True)
     st.progress(min(frac, 1.0), text={"ingest": "Loading source records into Bronze", "silver": "Building Silver", "gold": "Building Gold"}.get(run["stage"], "Working"))
 
 
