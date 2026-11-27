@@ -112,7 +112,6 @@ hr {{ margin: .6rem 0; }}
 .bl-err {{ color:{RED}; font-size:.78rem; padding-top:.3rem; border-top:1px solid {PANEL}; }}
 [data-testid="stVerticalBlockBorderWrapper"] {{ padding-bottom:.25rem; }}
 [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] {{ overflow:visible; }}
-.st-key-ing_diagram img {{ max-height:330px; width:auto !important; margin:0 auto; display:block; }}
 .st-key-tr_card, .st-key-rp_head {{ padding-bottom:.9rem !important; }}
 .st-key-bl_head [data-testid="stMarkdownContainer"] {{ margin-bottom:0 !important; }}
 .st-key-bl_head [data-testid="stMarkdownContainer"] p {{ margin:0 !important; }}

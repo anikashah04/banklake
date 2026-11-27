@@ -12,7 +12,6 @@ from banklake.masking import masking_rules
 from banklake.schemas import ORDER, SOURCES
 
 from .. import helpers
-from ..layout import CTRL
 from ..components import badge, fmt_int, strip, table
 
 SOURCE_SYSTEM = "Finacle core banking (Teradata)"
@@ -220,7 +219,7 @@ def _live_view():
     live = bool(snap) and snap["status"] == "RUNNING" and ingest.running()
     if snap and snap["status"] == "RUNNING" and not ingest.running():   # process restarted mid-run: do not claim success
         snap = dict(snap, status="FAILED", error="The ingestion process stopped before it finished.")
-    with st.container(border=True, key="ing_diagram"):
+    with st.container(border=True):
         st.image(_pipeline_svg(snap, arrows, None), width="stretch")
     if snap is None:
         return live
@@ -285,7 +284,7 @@ def _inspect(t):
 
 def _controls():
     from .. import flow
-    c1, c3, c2, c2h, c2b = st.columns(CTRL, vertical_alignment="bottom")
+    c1, c2, c2h, c2b, c3 = st.columns([1.1, 1.0, 1.0, 0.8, 1.6], vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Business date", "ing_date", flow.next_day_to_ingest() if "_bl_date" not in st.session_state else None)
     busy = ingest.running()
