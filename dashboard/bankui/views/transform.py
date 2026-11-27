@@ -11,6 +11,7 @@ from banklake.common import layer_path
 from banklake.transform import catalog, engine
 
 from ..components import badge, table
+from ..layout import CTRL
 from .etl import ARROW, INK, LINE, STATE_WORD, esc
 
 TITLE = catalog.LAYER_TITLE
@@ -76,7 +77,7 @@ def _svg(pid, rd, run):
     path = _path(pid)
     bronze = sorted({s for p in path if p["source_db"] == "bronze" for s in p["sources"]})
     b_ok = all(any(layer_path("bronze", t).glob("*.parquet")) for t in bronze)
-    o = ['<svg viewBox="0 0 1240 188" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman,Times,serif" text-rendering="geometricPrecision"><defs>']
+    o = ['<svg viewBox="0 0 1240 172" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman,Times,serif" text-rendering="geometricPrecision"><defs>']
     for k, col in ARROW.items():
         o.append(f'<marker id="p_{k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
                  f'<path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
@@ -149,12 +150,13 @@ def _summary(pid, rd, run):
     rows = f"{ld['output_count']:,}" if ld and status == "COMPLETED" else "-"
     k = lambda t: f"<div class='bl-k'>{t}</div>"  # noqa: E731
     with st.container(border=True, key="tr_card"):
-        c = st.columns([2.2, 3.2, 2.4, 1.1, 1.1], vertical_alignment="center")
+        c = st.columns([2.2, 3.2, 2.4, 1.1, 1.1])
         c[0].markdown(k("Transformation") + f"<div class='bl-v b'>{esc(p['target'])}</div>", unsafe_allow_html=True)
         c[1].markdown(k("Source Table") + "<div class='bl-v'>" + ", ".join(f"{esc(p['source_db'])}.{esc(s_)}" for s_ in p["sources"]) + "</div>", unsafe_allow_html=True)
         c[2].markdown(k("Target Table") + f"<div class='bl-v'>{esc(p['layer'])}.{esc(p['target'])}</div>", unsafe_allow_html=True)
         c[3].markdown(k("Rows Loaded") + f"<div class='bl-v num'>{rows}</div>", unsafe_allow_html=True)
         c[4].markdown(f"<div style='text-align:right'>{badge(status)}</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
         if status in BAD and detail:
             st.markdown(f"<div class='bl-err'>{esc(detail)}</div>", unsafe_allow_html=True)
 
@@ -257,7 +259,8 @@ def page():
         if run["report_date"] != str(st.session_state.get(flow.KEY)):
             st.session_state[flow.KEY] = date.fromisoformat(run["report_date"])
             st.session_state.pop("tr_date", None)
-    c1, c2, c3, _gap, c4, c5, c6 = st.columns([1.1, 1.0, 2.4, 0.9, 0.6, 0.8, 1.0], vertical_alignment="bottom")
+    c1, cm, c4, c5, c6 = st.columns(CTRL, vertical_alignment="bottom")
+    c2, c3 = cm.columns([1.2, 2.6], vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Report date", "tr_date")
     group = c2.segmented_control("Layer", list(catalog.GROUPS), default="Silver", key="tr_group", disabled=busy) or "Silver"

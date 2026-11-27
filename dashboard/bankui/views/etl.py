@@ -12,6 +12,7 @@ from banklake.masking import masking_rules
 from banklake.schemas import ORDER, SOURCES
 
 from .. import helpers
+from ..layout import CTRL
 from ..components import badge, fmt_int, strip, table
 
 SOURCE_SYSTEM = "Finacle core banking (Teradata)"
@@ -75,14 +76,14 @@ def _none():
 # ---------------------------------------------------------------- 1. the pipeline
 def _svg(c):
     tot = lambda d: sum(v or 0 for v in d.values()) if d else 0  # noqa: E731
-    src, br, mg, sv = tot(c["source"]), tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
+    br, mg, sv = tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
     n_gold = sum(v is not None for v in c["gold"].values())
-    W, H = 1240, 324
+    W, H = 1070, 250
     o = [f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman, Times, serif">',
          f'<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{MUTE}"/></marker></defs>']
 
     def group(x, w, title, color):
-        o.append(f'<rect x="{x}" y="14" width="{w}" height="296" rx="6" fill="#EEF2F6"/>'
+        o.append(f'<rect x="{x}" y="14" width="{w}" height="222" rx="6" fill="#EEF2F6"/>'
                  f'<text x="{x + 14}" y="38" font-size="11.5" font-weight="700" fill="#475569" letter-spacing=".1em">{title}</text>')
 
     def box(x, y, w, h, title, n, fill, tag=None):
@@ -99,20 +100,18 @@ def _svg(c):
 
     f = lambda v: "-" if not v else f"{v:,}"  # noqa: E731
     H = 130
-    box(10, 100, 140, H, "Source", f(src), "#475569")
-    arrow(150, 180, 165)
-    group(180, 200, "1  INGESTION", NAVY)
-    box(194, 100, 172, H, "Bronze", f(br), NAVY, "MASKED")
-    arrow(380, 410, 165)
-    group(410, 560, "2  TRANSFORMATION", NAVY)
-    box(424, 100, 160, H, "Silver Merge", f(mg), NAVY, "MASKED")
-    arrow(584, 610, 165)
-    box(610, 100, 160, H, "Silver Transform", f(sv), NAVY, "MASKED")
-    arrow(770, 796, 165)
-    box(796, 100, 160, H, "Gold", f"{n_gold} tables", GREEN, "UNMASKED")
-    arrow(970, 1000, 165)
-    group(1000, 230, "3  REPORTING", GREEN)
-    box(1014, 100, 202, H, "BI reports", f"{n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
+    group(10, 200, "1  INGESTION", NAVY)
+    box(24, 62, 172, H, "Bronze Ingestion", f(br), NAVY, "MASKED")
+    arrow(210, 240, 127)
+    group(240, 560, "2  TRANSFORMATION", NAVY)
+    box(254, 62, 160, H, "Silver Merge", f(mg), NAVY, "MASKED")
+    arrow(414, 440, 127)
+    box(440, 62, 160, H, "Silver Transform", f(sv), NAVY, "MASKED")
+    arrow(600, 626, 127)
+    box(626, 62, 160, H, "Gold", f"{n_gold} tables", GREEN, "UNMASKED")
+    arrow(800, 830, 127)
+    group(830, 230, "3  REPORTING", GREEN)
+    box(844, 62, 202, H, "BI reports", f"{n_gold} Gold tables" if n_gold else "-", GREEN, "UNMASKED")
     o.append("</svg>")
     return "".join(o)
 
@@ -221,7 +220,7 @@ def _live_view():
     live = bool(snap) and snap["status"] == "RUNNING" and ingest.running()
     if snap and snap["status"] == "RUNNING" and not ingest.running():   # process restarted mid-run: do not claim success
         snap = dict(snap, status="FAILED", error="The ingestion process stopped before it finished.")
-    with st.container(border=True):
+    with st.container(border=True, key="ing_diagram"):
         st.image(_pipeline_svg(snap, arrows, None), width="stretch")
     if snap is None:
         return live
@@ -286,7 +285,7 @@ def _inspect(t):
 
 def _controls():
     from .. import flow
-    c1, c2, c2h, c2b, c3 = st.columns([1.1, 1.0, 1.0, 0.8, 1.6], vertical_alignment="bottom")
+    c1, c3, c2, c2h, c2b = st.columns(CTRL, vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Business date", "ing_date", flow.next_day_to_ingest() if "_bl_date" not in st.session_state else None)
     busy = ingest.running()

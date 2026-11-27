@@ -18,7 +18,7 @@ CSS = f"""
 <style>
 html, body, [class*="css"] {{ font-size: 15px; font-family: "Times New Roman", Times, serif; }}
 .stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="material"]):not(svg):not(path) {{ font-family: "Times New Roman", Times, serif !important; }}
-.block-container {{ padding-top: 3.2rem; padding-bottom: 2rem; max-width: 100%; }}
+.block-container {{ padding: 3.2rem 2rem 2rem 2rem; max-width: 1440px; margin: 0 auto; }}
 header[data-testid="stHeader"] {{ background: transparent; height: 2.2rem; }}
 [data-testid="stToolbar"], [data-testid="stDecoration"], footer {{ display: none !important; }}
 h1 {{ font-size: 1.35rem !important; font-weight: 650 !important; letter-spacing: -0.01em; padding: 0.2rem 0 0.4rem 0 !important; }}
@@ -49,9 +49,11 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 
 /* header bar: navy, one row */
 .stApp {{ background:{BG}; }}
-.st-key-bl_head {{ background:{NAVY}; border-radius:4px; padding:.45rem .8rem; margin-bottom:.6rem; }}
+.st-key-bl_head {{ background:{NAVY}; border-radius:4px; padding:.7rem .8rem; margin-bottom:.8rem; }}
 .st-key-bl_head [data-testid="stHorizontalBlock"] {{ align-items:center; }}
-.bl-brand2 svg {{ display:block; margin:0; }}
+.bl-brand2 svg {{ display:block; margin:0; flex:none; }}
+.bl-brand2 .wm {{ color:#fff; font-size:1.25rem; font-weight:700; letter-spacing:.02em; line-height:1; }}
+.bl-brand2 .wm b {{ color:#86BC25; }}
 .bl-brand2 p {{ margin:0; }}
 .bl-brand2 {{ color:#fff; font-weight:700; letter-spacing:.14em; font-size:.95rem; white-space:nowrap; padding-left:0; display:flex; align-items:center; gap:.5rem; }}
 .st-key-bl_head [class*="st-key-step_"] {{ margin:0; }}
@@ -108,6 +110,13 @@ hr {{ margin: .6rem 0; }}
 .bl-v.b {{ font-weight:700; font-size:.95rem; }}
 .bl-v.num {{ font-variant-numeric:tabular-nums; text-align:right; }}
 .bl-err {{ color:{RED}; font-size:.78rem; padding-top:.3rem; border-top:1px solid {PANEL}; }}
+[data-testid="stVerticalBlockBorderWrapper"] {{ padding-bottom:.25rem; }}
+[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] {{ overflow:visible; }}
+.st-key-ing_diagram img {{ max-height:330px; width:auto !important; margin:0 auto; display:block; }}
+.st-key-tr_card, .st-key-rp_head {{ padding-bottom:.9rem !important; }}
+.st-key-bl_head [data-testid="stMarkdownContainer"] {{ margin-bottom:0 !important; }}
+.st-key-bl_head [data-testid="stMarkdownContainer"] p {{ margin:0 !important; }}
+.bl-brand2 {{ transform:translateY(5px); }}
 /* home */
 .st-key-home_bar {{ background:{NAVY}; border-left:4px solid {LIME}; border-radius:4px; padding:.5rem .9rem; margin-bottom:.7rem; }}
 .st-key-home_bar .bl-bar-text {{ color:#fff; font-size:.95rem; font-weight:550; }}
@@ -124,7 +133,7 @@ hr {{ margin: .6rem 0; }}
 .bl-card .d {{ color:{MUTED}; font-size:.82rem; margin-bottom:.55rem; }}
 .bl-card .f {{ display:flex; justify-content:space-between; font-size:.84rem; color:{MUTED}; padding:.25rem 0; border-top:1px solid #EEF2F6; }}
 .bl-card .f b {{ color:{INK}; font-weight:600; font-variant-numeric:tabular-nums; }}
-.bl-kpi {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.65rem .85rem .55rem; border-top:3px solid {GOLD}; margin-bottom:.6rem; min-height:6.4rem; }}
+.bl-kpi {{ border:1px solid {LINE}; border-radius:4px; background:#fff; padding:.65rem .85rem .55rem; border-top:3px solid {GOLD}; margin-bottom:.6rem; min-height:7.6rem; }}
 .bl-kpi .k {{ font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:{MUTED}; }}
 .bl-kpi .v {{ font-size:1.65rem; font-weight:650; color:{INK}; line-height:1.25; }}
 .bl-kpi .s {{ font-size:.76rem; color:{MUTED}; }}

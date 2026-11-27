@@ -229,10 +229,11 @@ def _lakehouse(con, out):
         b_rows = one(f"SELECT count(*) FROM {b}")
         b_bad = one(f"SELECT count(*) FROM {_pq('quarantine', 'bronze_' + e)}") if _has("quarantine", "bronze_" + e) else 0
         read = source_rows(e)
-        out.add(e, "BRONZE", "source_records_vs_bronze", read, b_rows + b_bad, read == b_rows + b_bad,
-                f"bronze={b_rows:,}, set aside={b_bad:,}; source count is taken from the loads still present in Bronze")
+        out.add(e, "BRONZE", "source_records_vs_bronze", read, b_rows, read == b_rows,
+                f"source count is taken from the loads still present in Bronze; {b_bad:,} rows sit in the Bronze quarantine folder" if b_bad else
+                "source count is taken from the loads still present in Bronze")
         mg_t, cl_t, rj_t = f"{e}_merge", f"{e}_clean", f"{e}_rejects"
-        rd = _latest_date(mg_t, "silver_merge")        # each table is checked for the report date it was last built for
+        rd = _latest_date(cl_t, "silver_transform") or _latest_date(mg_t, "silver_merge")   # each table is checked for the report date it was last built for
         if rd is None or not (_has(LH[0], mg_t) and _has(LH[1], cl_t)):
             out.add(e, "SILVER_MERGE", "layer_present", "table", "missing", False, "run Transformation for this table")
             continue

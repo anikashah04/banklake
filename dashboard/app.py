@@ -39,9 +39,15 @@ key = next((k for k, p in pages.items() if p is current), "home")
 legacy_page = key in ("overview", "validation")   # these two still show the run strip and Actions
 FLOW = ["home", "ingestion", "transformation", "reporting", "validation"]
 STEP_LABEL = {"home": "Home", "ingestion": "Step 1: Ingestion", "transformation": "Step 2: Transformation", "reporting": "Step 3: Reporting and BI", "validation": "Step 4: Validation", "overview": "Pipeline Overview"}
+BRAND = ('<div class="bl-brand2"><svg width="34" height="34" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">'
+         '<rect x="1" y="1" width="32" height="32" rx="8" fill="#000" stroke="#86BC25" stroke-width="1.6"/>'
+         '<path d="M7 12 q5 -5 10 0 t10 0" fill="none" stroke="#86BC25" stroke-width="2.4" stroke-linecap="round"/>'
+         '<path d="M7 18.5 q5 -5 10 0 t10 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'
+         '<path d="M7 25 q5 -5 10 0 t10 0" fill="none" stroke="#F58220" stroke-width="2.4" stroke-linecap="round"/></svg>'
+         '<span class="wm">Bank<b>Lake</b></span></div>')
 with st.container(key="bl_head"):
-    cols = st.columns([0.9, 0.7, 1.2, 1.5, 1.8, 1.25, 1.35, 0.75], gap="small", vertical_alignment="center")
-    cols[0].markdown('<div class="bl-brand2"><svg width="26" height="26" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="15" fill="#000" stroke="#fff" stroke-width="1.5"/><path d="M5 13 q5.5-5 11 0 t11 0" fill="none" stroke="#86BC25" stroke-width="2.4" stroke-linecap="round"/><path d="M5 19 q5.5-5 11 0 t11 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M5 25 q5.5-5 11 0 t11 0" fill="none" stroke="#F58220" stroke-width="2.4" stroke-linecap="round"/></svg></div>', unsafe_allow_html=True)
+    cols = st.columns([1.5, 0.8, 1.15, 1.35, 1.5, 1.2, 1.2, 0.8], gap="small", vertical_alignment="center")
+    cols[0].markdown(BRAND, unsafe_allow_html=True)
     for col, (pk, label) in zip(cols[1:7], STEP_LABEL.items()):
         cls = "step_current" if pk == key else "step_other"
         if col.button(label, key=f"{cls}_{pk}", width="stretch") and pk != key:

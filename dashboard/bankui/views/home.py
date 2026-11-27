@@ -8,6 +8,7 @@ from banklake import ingest, meta, pipeline_run
 from banklake.transform import catalog, engine
 
 from .. import flow, nav
+from ..layout import CTRL
 from ..components import badge
 from . import etl, report
 
@@ -56,7 +57,7 @@ def page():
     label, target, why = _next_step(f)
     working = pipeline_run.busy()
     with st.container(key="home_bar"):
-        a, b = st.columns([4, 1.2], vertical_alignment="center")
+        a, b = st.columns([sum(CTRL[:2]) + CTRL[2], sum(CTRL[3:])], vertical_alignment="center")
         a.markdown(f"<span class='bl-bar-text'>{html.escape('Run in progress' if working else why)}</span>", unsafe_allow_html=True)
         if b.button(label, width="stretch", key="home_continue", disabled=working):
             nav.open_page(target)
@@ -153,11 +154,11 @@ def _result(run, f):
 def _run_panel():
     busy = pipeline_run.busy()
     with st.container(border=True, key="home_runner"):
-        a, b = st.columns([1.2, 3.0], vertical_alignment="bottom")
+        a, _mid, b = st.columns([CTRL[0], CTRL[1] + CTRL[2], CTRL[3] + CTRL[4]], vertical_alignment="bottom")
         with a:
             fresh = flow.ingested_through() is None
             rd = flow.pick_date("Run date", "home_date", default=flow.next_day_to_ingest() if fresh else None)
-        go_ = b.button("Run Entire Pipeline", type="primary", key="home_run_all", disabled=busy)
+        go_ = b.button("Run Entire Pipeline", type="primary", key="home_run_all", disabled=busy, width="stretch")
         if go_:
             try:
                 pipeline_run.start(rd)

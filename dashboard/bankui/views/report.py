@@ -11,6 +11,7 @@ from banklake.transform import catalog, engine
 from ..components import badge, table
 from . import charts
 from .etl import ARROW, INK, MUTE, esc
+from ..layout import CTRL
 from .report_specs import SPECS
 
 BAD = ("FAILED", "BLOCKED")
@@ -366,7 +367,7 @@ def page():
         return
     cat = reports()
     busy = engine.running()
-    c1, c2, c3, c4 = st.columns([1.1, 3.0, 1.3, 1.0], vertical_alignment="bottom")
+    c1, c2, _slot, c3, c4 = st.columns(CTRL, vertical_alignment="bottom")
     with c1:
         bd = flow.pick_date("Report date", "rp_date")
     rd = bd.isoformat()
@@ -391,13 +392,14 @@ def page():
     with st.container(border=True):
         st.image(_svg(name, info, rd, states), width="stretch")
     failed = [t for t, (s, _) in states.items() if s == "failed"]
-    with st.container(border=True):
-        a, b = st.columns([4, 1.4], vertical_alignment="center")
+    with st.container(border=True, key="rp_head"):
+        a, b = st.columns([4, 1.4])
         a.markdown(f"<div style='font-weight:800;font-size:1.15rem;color:{INK}'>{esc(name)}</div>"
                    f"<div style='color:{MUTE};font-size:.85rem'>{esc(info['type'])} · "
                    + ", ".join(f"<code>{esc(t)}</code>" for t in info["tables"]) + "</div>", unsafe_allow_html=True)
         empties = [t for t, (s_, n_) in states.items() if s_ == "done" and n_ == 0]
         b.markdown(f"<div style='text-align:right'>{badge('NO DATA' if ready and empties else 'READY' if ready else 'FAILED' if failed else 'NOT READY')}</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
     if busy:
         _progress()
         return
