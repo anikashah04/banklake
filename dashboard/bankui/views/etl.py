@@ -355,7 +355,7 @@ def _dry_run_dialog(bd):
     st.success("Dry run complete. Nothing was written to Bronze or the vault.")
 
 
-    from .. import flow
+def ingestion():
     _prepare()
     _controls()
     if ingest.running():
