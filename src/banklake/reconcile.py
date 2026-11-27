@@ -192,6 +192,24 @@ def run_reconciliation(run_id=None) -> dict:
 LH = ("silver_merge_tables", "silver_transform_tables", "gold_tables")
 
 
+def source_rows(entity) -> int:
+    """Records the source held for what Bronze contains today. A repeated load of one period replaces its file and a snapshot replaces
+    everything before it, so only the batches still present in Bronze count, each with the figure from its latest successful load."""
+    if not _has("bronze", entity):
+        return 0
+    batches = {r[0] for r in duckdb.connect().execute(f"SELECT DISTINCT _batch_id FROM {_pq('bronze', entity)}").fetchall()}
+    latest = {}
+    for r in meta.query("SELECT batch_id, records_read FROM ingestion_audit_log WHERE entity=? AND status='SUCCESS' ORDER BY id", (entity,)):
+        latest[r["batch_id"]] = r["records_read"] or 0
+    return sum(v for k, v in latest.items() if k in batches)
+
+
+def _latest_date(table, layer):
+    """Report date of the most recent successful load of one table."""
+    r = meta.query("SELECT report_date FROM layer_audit_log WHERE layer=? AND target_table_name=? AND status='SUCCESS' ORDER BY id DESC LIMIT 1", (layer, table))
+    return r[0]["report_date"] if r else None
+
+
 def _lakehouse_built():
     return _has(LH[0], "customer_merge") or _has(LH[1], "customer_clean")
 
@@ -203,8 +221,6 @@ def _lakehouse(con, out):
     q = lambda sql: con.execute(sql).fetchall()  # noqa: E731
     one = lambda sql: con.execute(sql).fetchone()[0]  # noqa: E731
     ents = [p["sources"][0] for p in catalog.PROCS if p["layer"] == "silver_merge"]
-    dates = [r["d"] for r in meta.query("SELECT max(report_date) d FROM layer_audit_log WHERE layer='silver_merge' AND status='SUCCESS'") if r["d"]]
-    rd = dates[0] if dates else None
     for e in ents:
         if not _has("bronze", e):
             out.add(e, "BRONZE", "layer_present", "table", "missing", False, "ingest this table first")
@@ -212,10 +228,11 @@ def _lakehouse(con, out):
         b = _pq("bronze", e)
         b_rows = one(f"SELECT count(*) FROM {b}")
         b_bad = one(f"SELECT count(*) FROM {_pq('quarantine', 'bronze_' + e)}") if _has("quarantine", "bronze_" + e) else 0
-        read = meta.query("SELECT COALESCE(SUM(records_read),0) n FROM ingestion_audit_log WHERE entity=? AND status!='SKIPPED'", (e,))[0]["n"]
+        read = source_rows(e)
         out.add(e, "BRONZE", "source_records_vs_bronze", read, b_rows + b_bad, read == b_rows + b_bad,
-                f"bronze={b_rows:,}, set aside={b_bad:,}; source count is the sum of every load in the ingestion log")
+                f"bronze={b_rows:,}, set aside={b_bad:,}; source count is taken from the loads still present in Bronze")
         mg_t, cl_t, rj_t = f"{e}_merge", f"{e}_clean", f"{e}_rejects"
+        rd = _latest_date(mg_t, "silver_merge")        # each table is checked for the report date it was last built for
         if rd is None or not (_has(LH[0], mg_t) and _has(LH[1], cl_t)):
             out.add(e, "SILVER_MERGE", "layer_present", "table", "missing", False, "run Transformation for this table")
             continue
@@ -240,6 +257,7 @@ def _lakehouse(con, out):
         out.add(e, "SILVER_TRANSFORM", "deleted_keys_still_in_clean", 0, gone, gone == 0, "source deletes were applied")
     for g in catalog.procs_for("gold"):
         t = g["target"]
+        rd = _latest_date(t, "gold")
         if rd is None or not _has(LH[2], t):
             out.add(t, "GOLD", "layer_present", "table", "missing", False, "run Transformation for this table")
             continue

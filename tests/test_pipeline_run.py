@@ -133,3 +133,24 @@ assert first and first["stage"] == "SILVER_TRANSFORM" and first["entity"] == "ca
 print("OK")
 """, tmp_path)
     assert "OK" in out
+
+
+def test_validation_stays_clean_after_repeated_loads_and_runs_for_different_dates(tmp_path):
+    """Snapshot loads replace earlier Bronze files and every run builds its own report date: the checks must follow that."""
+    out = _run("""
+import time
+from datetime import date
+from banklake import meta, pipeline_run, reconcile
+meta.init_db()
+def go(d):
+    pipeline_run.start(d)
+    while pipeline_run.running(): time.sleep(0.3)
+    assert pipeline_run.current()["status"] in ("SUCCESS", "PARTIAL"), pipeline_run.current()
+go(date(2026, 7, 6)); go(date(2026, 7, 12)); go(date(2026, 7, 3))
+res = reconcile.run_reconciliation()
+fails = [(r["entity"], r["check_name"], r["source_value"], r["target_value"]) for r in res["results"] if r["status"] == "FAIL"]
+assert not fails, fails[:5]
+print("OK")
+""", tmp_path)
+    assert "OK" in out
+

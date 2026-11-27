@@ -11,6 +11,13 @@ from banklake.common import LAKE
 from banklake.schemas import ORDER
 
 
+@pytest.fixture(autouse=True)
+def _six_table_checks(monkeypatch):
+    """These tests build the original six-table pipeline; other modules may leave procedure-built layers in the shared lake."""
+    from banklake import reconcile as _rc
+    monkeypatch.setattr(_rc, "_lakehouse_built", lambda: False)
+
+
 @pytest.fixture(scope="module")
 def synced(lake):
     """Earlier test modules leave generated batches half-processed and a deleted raw file behind; rebuild a consistent state."""

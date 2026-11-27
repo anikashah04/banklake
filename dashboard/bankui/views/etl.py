@@ -36,9 +36,11 @@ def counts():
     where = {"silver_merge": ("silver_merge_tables", "{}_merge"), "silver": ("silver_transform_tables", "{}_clean")} if new else \
             {"silver_merge": ("silver_merge", "{}"), "silver": ("silver", "{}")}
     c = {"source": {}, "bronze": {}, "silver_merge": {}, "silver": {}, "gold": {}, "bad": {}}
-    for r in meta.query("SELECT entity, records_read FROM ingestion_audit_log WHERE status!='SKIPPED' ORDER BY id"):
-        c["source"][r["entity"]] = c["source"].get(r["entity"], 0) + (r["records_read"] or 0)   # all loads so far, same basis as Bronze
+    if not new:
+        for r in meta.query("SELECT entity, records_read FROM ingestion_audit_log WHERE status!='SKIPPED' ORDER BY id"):
+            c["source"][r["entity"]] = c["source"].get(r["entity"], 0) + (r["records_read"] or 0)
     for e in ents:
+        c["source"][e] = reconcile.source_rows(e) if new else None
         c["bronze"][e] = helpers.count("bronze", e) if helpers.has("bronze", e) else None
         for layer in ("silver_merge", "silver"):
             folder, pat = where[layer]

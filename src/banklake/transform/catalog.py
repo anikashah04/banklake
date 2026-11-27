@@ -238,7 +238,7 @@ def _rejects_sql(entity):
     {RD} AS report_date
 FROM silver_merge.{entity}_merge x{(chr(10) + join) if join else ''}
 WHERE {_cur('x', entity)}
-  AND {cond}"""
+  AND ({cond})"""
 
 
 def _derived():

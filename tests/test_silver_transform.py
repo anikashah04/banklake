@@ -38,6 +38,12 @@ def test_valid_and_rejected_outputs_are_disjoint_and_add_up(lake):
     assert a["rows_out"] + a["rejected"] <= a["rows_in"]  # merge-stage duplicates were already collapsed
 
 
+@pytest.fixture(autouse=True)
+def _six_table_checks(monkeypatch):
+    """These tests build the original six-table pipeline; other modules may leave procedure-built layers in the shared lake."""
+    monkeypatch.setattr(reconcile, "_lakehouse_built", lambda: False)
+
+
 def test_source_deletes_remove_rows_from_silver_and_reconcile_stays_clean(lake):
     from banklake import datagen
     info = datagen.generate_incremental(deletes=True)

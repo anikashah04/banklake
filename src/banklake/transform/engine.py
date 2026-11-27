@@ -128,8 +128,8 @@ def run_proc(pid, report_date, order_id, spark=None, convert_first=True):
     """Convert (if needed), generate (if needed) and run one procedure. Returns dict(status, rows_in, rows_out, error)."""
     p = catalog.BY_ID[pid]
     art = _artifact(pid)
-    if convert_first and (not art or art["athena_status"] != "CONVERTED"):
-        art = to_athena(pid)
+    if convert_first and (not art or art["athena_status"] != "CONVERTED" or convert.to_athena(p)["sql"] != art["athena_sql"]):
+        art = to_athena(pid)           # also when the catalog SQL changed since the stored copy was made: never run a stale script
     if art["athena_status"] != "CONVERTED":
         _audit(order_id, p["layer"], p["source_db"], p["target"], "FAILED", 0, 0, 0, "Athena conversion failed: " + art["athena_notes"][-200:], report_date)
         return dict(status="FAILED", rows_in=0, rows_out=0, error="Athena conversion failed")
