@@ -106,3 +106,30 @@ show('Executive Summary')       # mixes empty and filled tables: explains, never
 print("OK")
 """ % str(ROOT / "dashboard" / "app.py"), tmp_path)
     assert "OK" in out
+
+
+def test_validation_passes_on_the_layers_the_console_builds_and_catches_damage(tmp_path):
+    out = _run("""
+import time, shutil, glob
+from datetime import date
+import duckdb
+from banklake import meta, pipeline_run, reconcile
+from banklake.common import LAKE
+meta.init_db()
+pipeline_run.start(date(2026, 7, 2))
+while pipeline_run.running(): time.sleep(0.5)
+res = reconcile.run_reconciliation()
+fails = [r for r in res["results"] if r["status"] == "FAIL"]
+assert not fails, fails[:3]
+assert len(res["results"]) > 100
+# remove half the rows of a Silver Transform table: the check at that stage must fail and name the table
+f = sorted(glob.glob(str(LAKE / "silver_transform_tables" / "card_clean" / "*.parquet")))[0]
+con = duckdb.connect()
+con.execute(f"COPY (SELECT * FROM read_parquet('{f}') LIMIT 10) TO '{f}.tmp' (FORMAT PARQUET)")
+shutil.move(f + ".tmp", f)
+res = reconcile.run_reconciliation()
+first = res["first_failing_stage"]
+assert first and first["stage"] == "SILVER_TRANSFORM" and first["entity"] == "card", first
+print("OK")
+""", tmp_path)
+    assert "OK" in out

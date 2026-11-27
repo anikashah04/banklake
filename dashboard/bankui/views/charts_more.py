@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 PALETTE = ["#257de0", "#f47230", "#00b894", "#f2a600", "#ee7fac", "#008a17", "#6a4ce2", "#ec4647"]
 SEQ = [[0, "#E3EEFB"], [0.4, "#9CC3F0"], [0.75, "#257de0"], [1, "#1757A0"]]
 INK, MUTE, GRID = "#1F2937", "#6B7280", "#E6E9EE"
-FONT = dict(family="Inter, Segoe UI, Arial, sans-serif", size=12, color=INK)
+FONT = dict(family="Times New Roman, Times, serif", size=12, color=INK)
 KINDS_2D = ["Pie", "Treemap", "Sunburst", "Radar", "Gauge", "Lollipop"]
 KINDS_3D = ["3D Scatter", "3D Bubble", "3D Line", "3D Column", "3D Surface"]
 KINDS = KINDS_2D[:-1] + KINDS_3D            # Lollipop is drawn by Altair

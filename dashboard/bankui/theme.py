@@ -1,8 +1,9 @@
 """BankLake design system: one stylesheet. Navy sidebar, light workspace, muted blue accent, compact type."""
 import streamlit as st
 
-NAVY, NAVY_2, ACCENT, INK, MUTED, LINE = "#0F2942", "#1B3A5C", "#0F2942", "#1B2430", "#475569", "#D8E0E8"
-GOLD, GREEN, RED, PANEL, BG = "#B8860B", "#1E6B4B", "#A62626", "#EEF2F6", "#F5F7FA"
+NAVY, NAVY_2, ACCENT, INK, MUTED, LINE = "#0D0D0D", "#262626", "#0D0D0D", "#1A1A1A", "#4B5563", "#D9DEE3"
+GOLD, GREEN, RED, PANEL, BG = "#F58220", "#00836A", "#A62626", "#F1F3F5", "#F6F7F8"
+LIME = "#86BC25"
 STATUS = {  # status -> (text colour, background)
     "SUCCESS": ("#1E6B4B", "#E3F1EA"), "OK": ("#1E6B4B", "#E3F1EA"), "AVAILABLE": ("#1E6B4B", "#E3F1EA"), "PASS": ("#1E6B4B", "#E3F1EA"),
     "FAILED": ("#A62626", "#F8E4E2"), "FAIL": ("#A62626", "#F8E4E2"), "HIGH": ("#A62626", "#F8E4E2"),
@@ -15,8 +16,8 @@ STATUS = {  # status -> (text colour, background)
 
 CSS = f"""
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
-html, body, [class*="css"] {{ font-size: 14px; font-family: Inter, "Source Sans Pro", Arial, sans-serif; }}
+html, body, [class*="css"] {{ font-size: 15px; font-family: "Times New Roman", Times, serif; }}
+.stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="material"]):not(svg):not(path) {{ font-family: "Times New Roman", Times, serif !important; }}
 .block-container {{ padding-top: 3.2rem; padding-bottom: 2rem; max-width: 100%; }}
 header[data-testid="stHeader"] {{ background: transparent; height: 2.2rem; }}
 [data-testid="stToolbar"], [data-testid="stDecoration"], footer {{ display: none !important; }}
@@ -48,22 +49,22 @@ p, li, label, .stMarkdown {{ font-size: 0.9rem; }}
 
 /* header bar: navy, one row */
 .stApp {{ background:{BG}; }}
-.st-key-bl_head {{ background:{NAVY}; border-radius:4px; padding:.35rem .8rem; margin-bottom:.6rem; }}
+.st-key-bl_head {{ background:{NAVY}; border-radius:4px; padding:.45rem .8rem; margin-bottom:.6rem; }}
 .st-key-bl_head [data-testid="stHorizontalBlock"] {{ align-items:center; }}
-.bl-brand2 {{ color:#fff; font-weight:700; letter-spacing:.14em; font-size:.95rem; white-space:nowrap; border-left:3px solid {GOLD}; padding-left:.55rem; }}
+.bl-brand2 svg {{ display:block; margin:0; }}
+.bl-brand2 p {{ margin:0; }}
+.bl-brand2 {{ color:#fff; font-weight:700; letter-spacing:.14em; font-size:.95rem; white-space:nowrap; padding-left:0; display:flex; align-items:center; gap:.5rem; }}
 .st-key-bl_head [class*="st-key-step_"] {{ margin:0; }}
 .st-key-bl_head [class*="st-key-step_"] button {{ background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0; color:#B9C6D6; font-size:.82rem; font-weight:500; min-height:2.1rem; padding:.15rem .3rem; box-shadow:none; }}
 .st-key-bl_head [class*="st-key-step_"] button:hover {{ color:#fff; background:transparent; }}
 .st-key-bl_head [class*="st-key-step_"] button p {{ white-space:nowrap; }}
-.st-key-bl_head [class*="st-key-step_current_"] button {{ color:#fff; font-weight:650; border-bottom:2px solid {GOLD}; cursor:default; }}
-.st-key-bl_head [class*="st-key-step_next_"] button {{ color:#E8D9A8; }}
+.st-key-bl_head [class*="st-key-step_current_"] button {{ color:#fff; font-weight:650; border-bottom:2px solid {LIME}; cursor:default; }}
 .st-key-bl_head .st-key-bl_refresh button {{ background:transparent; border:1px solid #4A6585; color:#DCE5EF; font-size:.76rem; min-height:1.8rem; padding:.05rem .5rem; }}
 .bl-meta {{ display:flex; gap:0; align-items:stretch; background:#fff; border:1px solid {LINE}; border-radius:4px; }}
 .bl-meta > div {{ padding:.3rem .8rem; border-right:1px solid {LINE}; }}
 .bl-meta > div:last-child {{ border-right:none; }}
 .bl-meta .k {{ font-size:.62rem; text-transform:uppercase; letter-spacing:.07em; color:{MUTED}; display:block; line-height:1.1; }}
 .bl-meta .v {{ font-size:.8rem; color:{INK}; font-weight:550; }}
-.bl-foot {{ text-align:center; color:#64748B; font-size:.72rem; margin-top:1.2rem; }}
 
 /* components */
 .bl-badge {{ display:inline-block; font-size:.66rem; font-weight:650; letter-spacing:.04em; padding:.08rem .42rem; border-radius:3px; white-space:nowrap; }}
@@ -108,10 +109,10 @@ hr {{ margin: .6rem 0; }}
 .bl-v.num {{ font-variant-numeric:tabular-nums; text-align:right; }}
 .bl-err {{ color:{RED}; font-size:.78rem; padding-top:.3rem; border-top:1px solid {PANEL}; }}
 /* home */
-.st-key-home_bar {{ background:{NAVY}; border-left:4px solid {GOLD}; border-radius:4px; padding:.5rem .9rem; margin-bottom:.7rem; }}
+.st-key-home_bar {{ background:{NAVY}; border-left:4px solid {LIME}; border-radius:4px; padding:.5rem .9rem; margin-bottom:.7rem; }}
 .st-key-home_bar .bl-bar-text {{ color:#fff; font-size:.95rem; font-weight:550; }}
-.st-key-home_bar button {{ background:transparent; border:1px solid {GOLD}; color:#F3E3B0; }}
-.st-key-home_bar button:hover {{ background:{GOLD}; color:#fff; border-color:{GOLD}; }}
+.st-key-home_bar button {{ background:transparent; border:1px solid {LIME}; color:#E3F2C2; }}
+.st-key-home_bar button:hover {{ background:{LIME}; color:#0D0D0D; border-color:{LIME}; }}
 .st-key-home_runner {{ background:#fff; border:1px solid {LINE}; border-radius:4px; }}
 .bl-done {{ color:{GREEN}; font-weight:600; font-size:.9rem; padding:.2rem 0; }}
 .bl-done.warn {{ color:{GOLD}; }}

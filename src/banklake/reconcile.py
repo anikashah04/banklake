@@ -78,6 +78,11 @@ def run_reconciliation(run_id=None) -> dict:
     con, out = duckdb.connect(), _Out(run_id)
     q = lambda sql: con.execute(sql).fetchall()  # noqa: E731
 
+    if _lakehouse_built():
+        _lakehouse(con, out)
+        res = {"run_id": run_id, "results": out.rows, "first_failing_stage": _first_failure(out.rows)}
+        return res
+
     for e in ORDER:
         spec, k = ENTITIES[e], ENTITIES[e]["key"]
         absent = next((st for st, layer in [("BRONZE", "bronze"), ("SILVER_MERGE", "silver_merge"), ("SILVER_TRANSFORM", "silver")]
@@ -181,6 +186,67 @@ def run_reconciliation(run_id=None) -> dict:
     res = {"run_id": run_id, "results": out.rows}
     res["first_failing_stage"] = _first_failure(out.rows)
     return res
+
+
+# ------------------------------------------------------------ the Silver Merge / Silver Transform / Gold tables the console builds
+LH = ("silver_merge_tables", "silver_transform_tables", "gold_tables")
+
+
+def _lakehouse_built():
+    return _has(LH[0], "customer_merge") or _has(LH[1], "customer_clean")
+
+
+def _lakehouse(con, out):
+    """Checks for the procedure-driven layers. Each stage is compared with the one before it for the latest report date:
+    source records -> Bronze, Bronze keys -> merged rows, merged rows -> clean + rejects, and every Gold table against its audit row."""
+    from .transform import catalog
+    q = lambda sql: con.execute(sql).fetchall()  # noqa: E731
+    one = lambda sql: con.execute(sql).fetchone()[0]  # noqa: E731
+    ents = [p["sources"][0] for p in catalog.PROCS if p["layer"] == "silver_merge"]
+    dates = [r["d"] for r in meta.query("SELECT max(report_date) d FROM layer_audit_log WHERE layer='silver_merge' AND status='SUCCESS'") if r["d"]]
+    rd = dates[0] if dates else None
+    for e in ents:
+        if not _has("bronze", e):
+            out.add(e, "BRONZE", "layer_present", "table", "missing", False, "ingest this table first")
+            continue
+        b = _pq("bronze", e)
+        b_rows = one(f"SELECT count(*) FROM {b}")
+        b_bad = one(f"SELECT count(*) FROM {_pq('quarantine', 'bronze_' + e)}") if _has("quarantine", "bronze_" + e) else 0
+        read = meta.query("SELECT COALESCE(SUM(records_read),0) n FROM ingestion_audit_log WHERE entity=? AND status!='SKIPPED'", (e,))[0]["n"]
+        out.add(e, "BRONZE", "source_records_vs_bronze", read, b_rows + b_bad, read == b_rows + b_bad,
+                f"bronze={b_rows:,}, set aside={b_bad:,}; source count is the sum of every load in the ingestion log")
+        mg_t, cl_t, rj_t = f"{e}_merge", f"{e}_clean", f"{e}_rejects"
+        if rd is None or not (_has(LH[0], mg_t) and _has(LH[1], cl_t)):
+            out.add(e, "SILVER_MERGE", "layer_present", "table", "missing", False, "run Transformation for this table")
+            continue
+        mg, cl = _pq(LH[0], mg_t), _pq(LH[1], cl_t)
+        k = q(f"DESCRIBE SELECT * FROM {mg}")[0][0]
+        at = f"report_date = DATE '{rd}'"
+        bcols = {r[0] for r in q(f"DESCRIBE SELECT * FROM {b}")}
+        op = "AND upper(trim(coalesce(op_type,'I'))) IN ('I','U','D') " if "op_type" in bcols else ""
+        upd = (f"AND (try_cast(substr(updated_at,1,10) AS DATE) IS NULL OR try_cast(substr(updated_at,1,10) AS DATE) <= DATE '{rd}')"
+               if "updated_at" in bcols else "")
+        n_keys = one(f"SELECT count(DISTINCT {k}) FROM {b} WHERE {k} IS NOT NULL AND trim({k}) <> '' {op}{upd}")
+        n_m, n_md, n_live = q(f"SELECT count(*), count(DISTINCT {k}), count(*) FILTER (WHERE is_deleted = 0 AND {k} IS NOT NULL AND trim({k}) <> '') FROM {mg} WHERE {at}")[0]
+        out.add(e, "SILVER_MERGE", "bronze_keys_vs_merged_rows", n_keys, n_m, n_keys == n_m, f"one merged row per Bronze key as of {rd}")
+        out.add(e, "SILVER_MERGE", "merge_duplicate_keys", n_m, n_md, n_m == n_md, f"{n_m - n_md} duplicate key rows")
+        n_c = one(f"SELECT count(*) FROM {cl} WHERE {at}")
+        n_r = one(f"SELECT count(*) FROM {_pq(LH[1], rj_t)} WHERE {at}") if _has(LH[1], rj_t) else 0
+        out.add(e, "SILVER_TRANSFORM", "live_merged_vs_clean_plus_rejects", n_live, n_c + n_r, n_live == n_c + n_r,
+                f"clean={n_c:,}, rejected with a reason={n_r:,}")
+        d_c = one(f"SELECT count(*) - count(DISTINCT {k}) FROM {cl} WHERE {at}")
+        out.add(e, "SILVER_TRANSFORM", "duplicate_keys", n_c, n_c - d_c, d_c == 0, f"{d_c} duplicate key rows")
+        gone = one(f"SELECT count(*) FROM {cl} WHERE {at} AND {k} IN (SELECT {k} FROM {mg} WHERE {at} AND is_deleted = 1)")
+        out.add(e, "SILVER_TRANSFORM", "deleted_keys_still_in_clean", 0, gone, gone == 0, "source deletes were applied")
+    for g in catalog.procs_for("gold"):
+        t = g["target"]
+        if rd is None or not _has(LH[2], t):
+            out.add(t, "GOLD", "layer_present", "table", "missing", False, "run Transformation for this table")
+            continue
+        n = one(f"SELECT count(*) FROM {_pq(LH[2], t)} WHERE report_date = DATE '{rd}'")
+        a = meta.query("SELECT output_count FROM layer_audit_log WHERE layer='gold' AND target_table_name=? AND report_date=? AND status='SUCCESS' ORDER BY id DESC LIMIT 1", (t, rd))
+        out.add(t, "GOLD", "rows_vs_audit_log", a[0]["output_count"] if a else "none", n, bool(a) and a[0]["output_count"] == n,
+                "rows in the table for the report date vs the count the load recorded")
 
 
 def _joins_and_gold(con, out):

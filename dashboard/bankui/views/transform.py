@@ -76,7 +76,7 @@ def _svg(pid, rd, run):
     path = _path(pid)
     bronze = sorted({s for p in path if p["source_db"] == "bronze" for s in p["sources"]})
     b_ok = all(any(layer_path("bronze", t).glob("*.parquet")) for t in bronze)
-    o = ['<svg viewBox="0 0 1240 188" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" text-rendering="geometricPrecision"><defs>']
+    o = ['<svg viewBox="0 0 1240 188" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman,Times,serif" text-rendering="geometricPrecision"><defs>']
     for k, col in ARROW.items():
         o.append(f'<marker id="p_{k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
                  f'<path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')

@@ -17,27 +17,44 @@ from ..components import badge, fmt_int, strip, table
 SOURCE_SYSTEM = "Finacle core banking (Teradata)"
 EXAMPLE = {"NAME": "Aarav Mehta", "EMAIL": "aarav@example.com", "ACCOUNT": "123456789012", "PHONE": "9876543210"}
 INK, MUTE, LINE = "#1F2937", "#6B7280", "#CBD2DC"
-NAVY, GREEN, AMBER = "#172334", "#1F6B4F", "#B4690E"
+NAVY, GREEN, AMBER = "#111111", "#00836A", "#F58220"
 
 
 def _has_data():
-    return bool(meta.query("SELECT 1 FROM pipeline_execution_log LIMIT 1"))
+    from banklake import reconcile
+    return bool(meta.query("SELECT 1 FROM pipeline_execution_log LIMIT 1")) or reconcile._lakehouse_built()
 
 
 @st.cache_data(ttl=4, show_spinner=False)
 def counts():
+    """Row counts per layer. When the procedure-driven layers exist (Silver Merge, Silver Transform, Gold) those are counted;
+    the older six-table pipeline is counted only when they do not."""
+    from banklake import reconcile
+    from banklake.transform import catalog
+    new = reconcile._lakehouse_built()
+    ents = [p["sources"][0] for p in catalog.PROCS if p["layer"] == "silver_merge"] if new else list(ORDER)
+    where = {"silver_merge": ("silver_merge_tables", "{}_merge"), "silver": ("silver_transform_tables", "{}_clean")} if new else \
+            {"silver_merge": ("silver_merge", "{}"), "silver": ("silver", "{}")}
     c = {"source": {}, "bronze": {}, "silver_merge": {}, "silver": {}, "gold": {}, "bad": {}}
-    rows = meta.query("SELECT entity, records_read FROM ingestion_audit_log WHERE status!='SKIPPED' ORDER BY id")
-    for r in rows:
+    for r in meta.query("SELECT entity, records_read FROM ingestion_audit_log WHERE status!='SKIPPED' ORDER BY id"):
         c["source"][r["entity"]] = c["source"].get(r["entity"], 0) + (r["records_read"] or 0)   # all loads so far, same basis as Bronze
-    for e in ORDER:
-        for layer, key in (("bronze", "bronze"), ("silver_merge", "silver_merge"), ("silver", "silver")):
-            c[layer][e] = helpers.count(layer, e) if helpers.has(layer, e) else None
-            c["bad"][(layer, e)] = helpers.count("quarantine", f"{layer}_{e}") if helpers.has("quarantine", f"{layer}_{e}") else 0
-    for g in GOLD_LINEAGE:
-        c["gold"][g] = helpers.count("gold", g) if helpers.has("gold", g) else None
+    for e in ents:
+        c["bronze"][e] = helpers.count("bronze", e) if helpers.has("bronze", e) else None
+        for layer in ("silver_merge", "silver"):
+            folder, pat = where[layer]
+            c[layer][e] = helpers.count(folder, pat.format(e)) if helpers.has(folder, pat.format(e)) else None
+        c["bad"][("bronze", e)] = helpers.count("quarantine", f"bronze_{e}") if helpers.has("quarantine", f"bronze_{e}") else 0
+        if new:
+            rj = f"{e}_rejects"
+            c["bad"][("silver_merge", e)] = 0
+            c["bad"][("silver", e)] = helpers.count("silver_transform_tables", rj) if helpers.has("silver_transform_tables", rj) else 0
+        else:
+            for layer in ("silver_merge", "silver"):
+                c["bad"][(layer, e)] = helpers.count("quarantine", f"{layer}_{e}") if helpers.has("quarantine", f"{layer}_{e}") else 0
+    for g in ([p["target"] for p in catalog.procs_for("gold")] if new else GOLD_LINEAGE):
+        folder = "gold_tables" if new else "gold"
+        c["gold"][g] = helpers.count(folder, g) if helpers.has(folder, g) else None
     return c
-
 
 
 def _none():
@@ -59,7 +76,7 @@ def _svg(c):
     src, br, mg, sv = tot(c["source"]), tot(c["bronze"]), tot(c["silver_merge"]), tot(c["silver"])
     n_gold = sum(v is not None for v in c["gold"].values())
     W, H = 1240, 324
-    o = [f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter, Arial, sans-serif">',
+    o = [f'<svg viewBox="0 0 {W} {H}" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman, Times, serif">',
          f'<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{MUTE}"/></marker></defs>']
 
     def group(x, w, title, color):
@@ -112,7 +129,7 @@ def home():
 
 
 # ---------------------------------------------------------------- 2. ingestion
-ARROW = {"waiting": "#9CA3AF", "processing": "#D97706", "done": "#1F6B4F", "failed": "#B42318", "idle": "#CBD2DC"}
+ARROW = {"waiting": "#9CA3AF", "processing": "#D97706", "done": "#00836A", "failed": "#B42318", "idle": "#CBD2DC"}
 STAGE_NAME = {"extract": "Extraction", "transform": "Masking", "insert": "Bronze ingestion"}
 STATE_WORD = {"waiting": "Waiting", "processing": "Processing", "done": "Completed", "failed": "Failed"}
 esc = html.escape
@@ -124,7 +141,7 @@ def _pipeline_svg(snap, arrows, src_rows):
     ext = sum(t["extracted"] for t in tabs)
     trn = sum(t["transformed"] for t in tabs)
     ins = sum(t["inserted"] for t in tabs)
-    o = ['<svg viewBox="0 0 1180 392" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" text-rendering="geometricPrecision">']
+    o = ['<svg viewBox="0 0 1180 392" xmlns="http://www.w3.org/2000/svg" font-family="Times New Roman,Times,serif" text-rendering="geometricPrecision">']
     o.append("<defs>")
     for k, col in ARROW.items():
         o.append(f'<marker id="a_{k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
@@ -350,7 +367,7 @@ def _live_fragment():
 def _steps(c):
     rows = []
     for key, name in (("silver_merge", "Silver Merge"), ("silver", "Silver Transform")):
-        for e in ORDER:
+        for e in c["bronze"]:
             prev = c["bronze"][e] if key == "silver_merge" else c["silver_merge"][e]
             rows.append({"step": name, "table": e, "input rows": prev, "output rows": c[key][e], "set aside": c["bad"][(key, e)]})
     return rows
@@ -384,7 +401,7 @@ def validation():
         return
     c = counts()
     rows = []
-    for e in ORDER:
+    for e in c["bronze"]:
         rejected = c["bad"][("bronze", e)] + c["bad"][("silver_merge", e)] + c["bad"][("silver", e)]
         rows.append({"table": e, "source": c["source"].get(e), "Bronze": c["bronze"].get(e), "Silver Merge": c["silver_merge"].get(e),
                      "Silver Transform": c["silver"].get(e), "set aside": rejected})

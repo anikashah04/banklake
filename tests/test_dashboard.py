@@ -113,9 +113,8 @@ def test_every_safe_button_on_every_page_does_something(lake):
 
 
 def test_every_page_has_the_same_step_bar_with_the_current_step_marked(lake):
-    labels = ["Home", "1  Ingestion", "2  Transformation", "3  Reporting and BI", "Validation", "Pipeline Overview"]
+    labels = ["Home", "Step 1: Ingestion", "Step 2: Transformation", "Step 3: Reporting and BI", "Step 4: Validation", "Pipeline Overview"]
     order = ["home", "ingestion", "transformation", "reporting", "validation", "overview"]
-    following = {"ingestion": "transformation", "transformation": "reporting", "reporting": "validation"}
     at = AppTest.from_file(APP, default_timeout=120).run()
     pages = _pages(at)
     for name in order:
@@ -126,8 +125,7 @@ def test_every_page_has_the_same_step_bar_with_the_current_step_marked(lake):
         assert [b.label for b in steps] == labels, (name, [b.label for b in steps])
         cur = [b for b in steps if str(b.key).startswith("step_current_")]
         assert [b.key for b in cur] == [f"step_current_{name}"], (name, [b.key for b in cur])
-        nxt = [b.key for b in steps if str(b.key).startswith("step_next_")]
-        assert nxt == ([f"step_next_{following[name]}"] if name in following else []), (name, nxt)
+        assert not [b for b in steps if str(b.key).startswith("step_next_")], name         # no "next" highlight: every tab looks the same
         assert not [b for b in at.button if b.label.startswith(("Next:", "Back"))], name       # no second set of forward buttons
 
 

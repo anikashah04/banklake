@@ -51,7 +51,7 @@ def _agg(df, dims, measures, how="sum"):
 def _style(ch, title=None, height=H):
     ch = ch.properties(height=height, background=SURFACE, **({"title": alt.TitleParams(title, anchor="start", fontSize=13, fontWeight=600, color=INK)} if title else {}))
     return (ch.configure_axis(gridColor=GRID, domain=False, tickColor=GRID, labelColor=MUTE, titleColor=MUTE, labelFontSize=11, titleFontSize=11)
-              .configure_view(stroke=None).configure_legend(labelColor=INK, labelFontSize=11).configure(font="Inter, Segoe UI, Arial, sans-serif"))
+              .configure_view(stroke=None).configure_legend(labelColor=INK, labelFontSize=11).configure(font="Times New Roman, Times, serif"))
 
 
 def _num(c, fmt=",.0f"):
